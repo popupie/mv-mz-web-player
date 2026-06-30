@@ -27,7 +27,7 @@ export function useGameLibrary(onImportStart?: () => void) {
   const [error, setError] = useState<string | null>(null);
   const [storage, setStorage] = useState<StorageEstimate | undefined>();
 
-  const activeGame = useMemo(() => games.find((game) => game.id === activeGameId) ?? games[0], [activeGameId, games]);
+  const activeGame = useMemo(() => games.find((game) => game.id === activeGameId), [activeGameId, games]);
 
   useEffect(() => {
     void boot();
@@ -49,8 +49,6 @@ export function useGameLibrary(onImportStart?: () => void) {
     setStorage(await estimateStorage());
     if (nextActiveId) {
       setActiveGameId(nextActiveId);
-    } else if (!activeGameId && nextGames.length > 0) {
-      setActiveGameId(nextGames[0].id);
     }
   }
 

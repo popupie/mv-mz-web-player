@@ -28,6 +28,7 @@ interface LibraryPanelProps {
   resetError: () => void;
   setAboutOpen: (open: boolean | ((open: boolean) => boolean)) => void;
   setActiveGameId: (gameId: string) => void;
+  setIdle: () => void;
   setDictionaryGuard: (game: GameRecord, guard: DictionaryDismissGuard) => void;
   setRecordingGuardTrigger: (recording: boolean) => void;
   storage?: StorageEstimate;
@@ -52,6 +53,7 @@ export function LibraryPanel({
   resetError,
   setAboutOpen,
   setActiveGameId,
+  setIdle,
   setDictionaryGuard,
   setRecordingGuardTrigger,
   storage,
@@ -68,7 +70,18 @@ export function LibraryPanel({
             <button
               type="button"
               className="icon-button info-button"
+              aria-label="Home"
+              title="Home"
+              aria-pressed={!activeGame}
+              onClick={setIdle}
+            >
+              <Icon name="home" />
+            </button>
+            <button
+              type="button"
+              className="icon-button info-button"
               aria-label="About"
+              title="About"
               aria-pressed={aboutOpen}
               onClick={() => setAboutOpen((open) => !open)}
             >

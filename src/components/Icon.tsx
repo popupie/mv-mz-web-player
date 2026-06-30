@@ -7,6 +7,7 @@ export type IconName =
   | "focus"
   | "folder"
   | "fullscreen"
+  | "home"
   | "info"
   | "layers"
   | "logs"
@@ -47,6 +48,13 @@ export function Icon({ name }: { name: IconName }) {
         <path d="M15 4h4a1 1 0 0 1 1 1v4" />
         <path d="M20 15v4a1 1 0 0 1-1 1h-4" />
         <path d="M9 20H5a1 1 0 0 1-1-1v-4" />
+      </>
+    ),
+    home: (
+      <>
+        <path d="m3 11 9-8 9 8" />
+        <path d="M5 10v10h14V10" />
+        <path d="M9 20v-6h6v6" />
       </>
     ),
     info: (
