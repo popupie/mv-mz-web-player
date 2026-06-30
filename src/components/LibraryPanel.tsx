@@ -72,7 +72,6 @@ export function LibraryPanel({
               className="icon-button info-button"
               aria-label="Home"
               title="Home"
-              aria-pressed={!activeGame}
               onClick={setIdle}
             >
               <Icon name="home" />
