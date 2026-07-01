@@ -463,6 +463,15 @@
       overlayState.hoveredTextEntry = null;
     };
 
+    const consumeOverlayPointer = (event) => {
+      const entry = overlayTextEntry(event.target);
+      if (!entry) return;
+      overlayState.hoveredTextEntry = entry;
+      event.stopPropagation();
+      if (typeof event.stopImmediatePropagation === "function") event.stopImmediatePropagation();
+      if (event.type === "pointerup" || event.type === "mouseup" || event.type === "click" || event.type === "touchend") returnFocus();
+    };
+
     const returnFocus = () => {
       if (!settings.readerMode) return;
       window.setTimeout(() => {
@@ -470,6 +479,9 @@
       }, 0);
     };
 
+    for (const type of ["pointerdown", "pointerup", "mousedown", "mouseup", "click", "dblclick", "contextmenu", "touchstart", "touchend"]) {
+      window.addEventListener(type, consumeOverlayPointer, true);
+    }
     overlayState.root.addEventListener("pointerover", trackOverlayText, true);
     overlayState.root.addEventListener("pointermove", trackOverlayText, true);
     overlayState.root.addEventListener("pointerdown", trackOverlayText, true);
