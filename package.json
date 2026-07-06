@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "engines": {
-    "node": ">=22"
+    "node": ">=22",
+    "pnpm": ">=11"
   },
   "scripts": {
     "build:player-runtime": "node scripts/build-player-runtime.mjs",
