@@ -157,6 +157,7 @@ export default function App() {
         directoryInputRef={directoryInputRef}
         error={library.error}
         games={library.games}
+        downloadSaves={(game) => void library.downloadSaves(game)}
         importFolder={library.importFolder}
         importZip={library.importZip}
         progress={library.progress}

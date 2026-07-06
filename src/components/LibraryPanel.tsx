@@ -17,6 +17,7 @@ interface LibraryPanelProps {
   directoryInputRef: RefObject<HTMLInputElement | null>;
   error: string | null;
   games: GameRecord[];
+  downloadSaves: (game: GameRecord) => void;
   importFolder: (event: ChangeEvent<HTMLInputElement>) => void;
   importZip: (event: ChangeEvent<HTMLInputElement>) => void;
   progress: ImportProgress;
@@ -42,6 +43,7 @@ export function LibraryPanel({
   directoryInputRef,
   error,
   games,
+  downloadSaves,
   importFolder,
   importZip,
   progress,
@@ -149,6 +151,7 @@ export function LibraryPanel({
             active={game.id === activeGame?.id}
             game={game}
             onDelete={removeGame}
+            onDownloadSaves={downloadSaves}
             onSelect={setActiveGameId}
           />
         ))}

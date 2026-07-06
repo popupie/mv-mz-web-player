@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 export type IconName =
   | "archive"
   | "chevronDown"
+  | "download"
   | "eye"
   | "focus"
   | "folder"
@@ -26,6 +27,13 @@ export function Icon({ name }: { name: IconName }) {
       </>
     ),
     chevronDown: <path d="m6 9 6 6 6-6" />,
+    download: (
+      <>
+        <path d="M12 3v12" />
+        <path d="m7 10 5 5 5-5" />
+        <path d="M5 21h14" />
+      </>
+    ),
     eye: (
       <>
         <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6Z" />

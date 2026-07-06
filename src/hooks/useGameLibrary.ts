@@ -1,6 +1,7 @@
 import { ChangeEvent, useEffect, useMemo, useState } from "react";
 import { candidateFromFolder, candidateFromZip, importCandidate } from "../lib/importer";
 import { normalizePlayerSettings } from "../lib/playerSettings";
+import { downloadSaveZip } from "../lib/saveExport";
 import { registerPlayerServiceWorker } from "../lib/serviceWorker";
 import { deleteGame, estimateStorage, getAllGames, updateGameSettings } from "../lib/storage";
 import type { GameRecord, ImportProgress } from "../lib/types";
@@ -98,6 +99,15 @@ export function useGameLibrary(onImportStart?: () => void) {
     setStorage(await estimateStorage());
   }
 
+  async function downloadSaves(game: GameRecord) {
+    setError(null);
+    try {
+      await downloadSaveZip(game);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Save download failed.");
+    }
+  }
+
   async function saveGameSettings(game: GameRecord, patch: Partial<GameRecord["settings"]>): Promise<GameRecord> {
     const updated: GameRecord = {
       ...game,
@@ -118,6 +128,7 @@ export function useGameLibrary(onImportStart?: () => void) {
     importFolder,
     importZip,
     progress,
+    downloadSaves,
     removeGame,
     saveGameSettings,
     setActiveGameId,

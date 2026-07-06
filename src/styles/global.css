@@ -363,7 +363,7 @@ progress::-moz-progress-bar {
 
 .game-card {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 40px;
+  grid-template-columns: minmax(0, 1fr) 40px 40px;
   min-height: 67.5px;
   gap: 8px;
   align-items: stretch;
