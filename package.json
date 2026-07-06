@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "build:player-runtime": "node scripts/build-player-runtime.mjs",
     "dev": "pnpm run build:player-runtime && vite --host 127.0.0.1",
