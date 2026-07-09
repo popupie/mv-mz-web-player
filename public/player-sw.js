@@ -37,10 +37,6 @@ self.addEventListener("message", (event) => {
     fileCache.delete(event.data.gameId);
     return;
   }
-  if (event.data && event.data.type === "clear-cache") {
-    gameCache.clear();
-    fileCache.clear();
-  }
 });
 
 function openDb() {
