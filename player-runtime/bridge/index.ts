@@ -5,6 +5,7 @@ import { createSettingsStore } from "./settings";
 import { patchLocalStorage } from "./storageNamespace";
 import { createTextOverlayBridge } from "./overlay";
 import { createViewportBridge } from "./viewport";
+import { installRpgMakerEncryptionFallback } from "./encryptionFallback";
 
 (() => {
   const config = window.__MZ_PLAYER_BRIDGE__;
@@ -37,6 +38,7 @@ import { createViewportBridge } from "./viewport";
   parent.installMessageBridge();
   parent.installErrorBridge();
   viewport.installViewportBridge();
+  installRpgMakerEncryptionFallback();
   overlay.ensureOverlayDom();
   overlay.installRpgMakerOverlayHooks();
   overlay.installDictionaryGuardInputHooks();

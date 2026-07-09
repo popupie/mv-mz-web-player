@@ -5,6 +5,7 @@ const FILE_STORE = "files";
 const BLOB_STORE = "blobs";
 const HANDLE_STORE = "handles";
 const PLAYER_DESKTOP_RUNTIME_VERSION = "desktop-api-1";
+const PLAYER_BRIDGE_RUNTIME_VERSION = "bridge-api-1";
 let dbPromise;
 const gameCache = new Map();
 const fileCache = new Map();
@@ -383,7 +384,7 @@ function injectBridge(html, game, files) {
   const runtimeScripts = [
     `<script src="/mz-player-runtime/buffer.js?v=${PLAYER_DESKTOP_RUNTIME_VERSION}"></script>`,
     `<script src="/mz-player-runtime/desktop.js?v=${PLAYER_DESKTOP_RUNTIME_VERSION}"></script>`,
-    `<script src="/runtime-bridge.js"></script>`,
+    `<script src="/runtime-bridge.js?v=${PLAYER_BRIDGE_RUNTIME_VERSION}"></script>`,
   ].join("");
   const config = `${bridgeConfig}${desktopConfig}${runtimeScripts}`;
 
