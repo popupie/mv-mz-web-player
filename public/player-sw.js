@@ -190,9 +190,8 @@ async function getGame(gameId) {
   const game = await requestToPromise(
     db.transaction(GAME_STORE, "readonly").objectStore(GAME_STORE).get(gameId),
   );
-  const normalized = game && { ...game, sourceKind: game.sourceKind || "stored" };
-  gameCache.set(gameId, normalized);
-  return normalized;
+  gameCache.set(gameId, game);
+  return game;
 }
 
 async function getGameFileMap(gameId) {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { findEntryPath, findPathRecord, mojibakePathAliases, normalizeStoredPath, stripCommonWrapper, titleFromEntry } from "../src/lib/paths";
+import { findEntryPath, mojibakePathAliases, normalizeStoredPath, stripCommonWrapper, titleFromEntry } from "../src/lib/paths";
 
 describe("path helpers", () => {
   it("normalizes separators and removes traversal", () => {
@@ -27,14 +27,6 @@ describe("path helpers", () => {
     expect(titleFromEntry(["index.html"], "archive.zip")).toBe("archive");
   });
 
-  it("finds stored paths with exact match before case-insensitive fallback", () => {
-    const exact = { path: "www/js/plugins/YEP_X_VisualHpGauge.js" };
-    const caseMatch = { path: "www/js/plugins/YEP_X_VisualHPGauge.js" };
-
-    expect(findPathRecord([exact, caseMatch], "www/js/plugins/YEP_X_VisualHpGauge.js")).toBe(exact);
-    expect(findPathRecord([caseMatch], "www/js/plugins/YEP_X_VisualHpGauge.js")).toBe(caseMatch);
-  });
-
   it("recovers common Japanese mojibake path aliases", () => {
     const samples = [
       ["www/img/pictures/■制作・クレジット.txt", "www/img/pictures/üíÉºì∞üEâNâîâWâbâg.txt"],
@@ -44,21 +36,7 @@ describe("path helpers", () => {
     ];
 
     for (const [requestedPath, storedPath] of samples) {
-      const record = { path: storedPath };
       expect(mojibakePathAliases(storedPath)).toContain(requestedPath);
-      expect(findPathRecord([record], requestedPath)).toBe(record);
     }
-  });
-
-  it("keeps exact paths ahead of mojibake aliases", () => {
-    const exact = { path: "www/img/pictures/AAA_説明14.rpgmvp" };
-    const mojibake = { path: "www/img/pictures/AAA_Éαû╛14.rpgmvp" };
-
-    expect(findPathRecord([exact, mojibake], "www/img/pictures/AAA_説明14.rpgmvp")).toBe(exact);
-  });
-
-  it("does not alias encrypted and plain RPG Maker asset extensions", () => {
-    expect(findPathRecord([{ path: "www/img/pictures/Hero.rpgmvp" }], "www/img/pictures/Hero.png")).toBeUndefined();
-    expect(findPathRecord([{ path: "www/audio/bgm/Theme.ogg" }], "www/audio/bgm/Theme.rpgmvo")).toBeUndefined();
   });
 });

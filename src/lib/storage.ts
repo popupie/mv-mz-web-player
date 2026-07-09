@@ -242,16 +242,6 @@ export async function putIndexedDbBlobs(records: Array<{ gameId: string; path: s
   });
 }
 
-export async function getStoredFile(gameId: string, path: string): Promise<StoredGameFile | undefined> {
-  const db = await openPlayerDb();
-  try {
-    const transaction = db.transaction(FILE_STORE, "readonly");
-    return await requestToPromise<StoredGameFile | undefined>(transaction.objectStore(FILE_STORE).get(fileKey(gameId, path)));
-  } finally {
-    db.close();
-  }
-}
-
 export async function getIndexedDbBlob(storageRef: string): Promise<Blob | undefined> {
   const db = await openPlayerDb();
   try {

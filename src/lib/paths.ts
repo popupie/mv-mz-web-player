@@ -95,36 +95,6 @@ export function mojibakePathAliases(path: string): string[] {
   return aliases;
 }
 
-export function findPathRecord<T extends { path: string }>(records: T[], path: string): T | undefined {
-  const requestedPath = normalizeStoredPath(path);
-  if (!requestedPath) return undefined;
-
-  for (const record of records) {
-    if (normalizeStoredPath(record.path) === requestedPath) return record;
-  }
-
-  const lowerRecords = new Map<string, T>();
-  for (const record of records) {
-    const key = normalizeStoredPath(record.path).toLowerCase();
-    if (key && !lowerRecords.has(key)) lowerRecords.set(key, record);
-  }
-
-  const caseMatch = lowerRecords.get(requestedPath.toLowerCase());
-  if (caseMatch) return caseMatch;
-
-  const aliasRecords = new Map<string, T>();
-  const lowerAliasRecords = new Map<string, T>();
-  for (const record of records) {
-    for (const alias of mojibakePathAliases(record.path)) {
-      if (!aliasRecords.has(alias)) aliasRecords.set(alias, record);
-      const lowerAlias = alias.toLowerCase();
-      if (!lowerAliasRecords.has(lowerAlias)) lowerAliasRecords.set(lowerAlias, record);
-    }
-  }
-
-  return aliasRecords.get(requestedPath) ?? lowerAliasRecords.get(requestedPath.toLowerCase());
-}
-
 export function stripCommonWrapper<T extends { path: string }>(entries: T[]): T[] {
   const paths = entries.map((entry) => normalizeStoredPath(entry.path)).filter(Boolean);
   if (paths.length === 0) return entries;
