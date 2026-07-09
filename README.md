@@ -24,13 +24,15 @@ project and is not included with this app.
 3. Make sure the folder or ZIP contains game `index.html`.
 4. Wait while the app scans the folder or imports the ZIP.
 5. Select the game from the library.
-6. Play the game in the player area.
-7. Use Focus if the game does not receive keyboard input.
-8. Use Fullscreen when you want a larger play view.
-9. Use Overlay to collect game text in a readable text log.
-10. Use Show to make overlay text visible on top of the game.
-11. Use Guard to stop chosen keys from going into the game.
-12. Download saves from the library when you want to export save data.
+6. If a session folder says `not bound`, select it and choose the
+   same folder again.
+7. Play the game in the player area.
+8. Use Focus if the game does not receive keyboard input.
+9. Use Fullscreen when you want a larger play view.
+10. Use Overlay to collect game text in a readable text log.
+11. Use Show to make overlay text visible on top of the game.
+12. Use Guard to stop chosen keys from going into the game.
+13. Download saves from the library when you want to export save data.
 
 ## Web Export Examples
 
@@ -103,6 +105,10 @@ accounts.
 
 Your browser may still limit or clear storage based on its own settings. Export
 your saves when you want to keep a backup outside the browser.
+
+ZIP imports are stored in browser storage. Folder opens may be persistent when
+the browser supports folder handles, or session-only when it only supports the
+older folder picker.
 
 ## Notes
 

@@ -37,11 +37,13 @@ export function AboutModal({ onClose }: AboutModalProps) {
               portable game.
             </li>
             <li>
-              Make sure it contains game <code>index.html</code>.
+              If a session folder shows not bound, select it and choose the same
+              folder again.
             </li>
             <li>
-              Select a game from the library.
+              Make sure it contains game <code>index.html</code>.
             </li>
+            <li>Select a game from the library.</li>
             <li>Use the Overlay for transparent selectable text.</li>
             <li>Enable Show to make overlay text visible.</li>
             <li>Use Guard to stop configured keys from entering the game.</li>
@@ -58,6 +60,10 @@ export function AboutModal({ onClose }: AboutModalProps) {
           <p>
             This is a backendless static web app. It does not need a server
             database or user accounts.
+          </p>
+          <p>
+            Large folder games are linked for the current browser session when
+            persistent folder access is unavailable.
           </p>
         </div>
 
