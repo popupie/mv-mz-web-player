@@ -201,7 +201,7 @@ export function LibraryPanel({
         />
 
         <div className="storage-meter">
-          <div>
+          <div className="storage-meter-header">
             <span>Browser storage</span>
             <span>{storageText}</span>
           </div>
