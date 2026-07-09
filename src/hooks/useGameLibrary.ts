@@ -5,11 +5,19 @@ import {
   candidateFromZip,
   importCandidate,
   importLocalFolderCandidate,
+  importSessionFolderCandidate,
+  bindSessionFolderCandidate,
 } from "../lib/importer";
 import { clearGameStorageNamespace } from "../lib/keys";
 import { normalizePlayerSettings } from "../lib/playerSettings";
 import { downloadSaveZip } from "../lib/saveExport";
 import { registerPlayerServiceWorker } from "../lib/serviceWorker";
+import {
+  clearSessionFolder,
+  getSessionFolderFile,
+  hasSessionFolder,
+  registerSessionFolder,
+} from "../lib/sessionFiles";
 import {
   deleteGame,
   estimateStorage,
@@ -28,7 +36,6 @@ export const idleProgress: ImportProgress = {
 };
 
 type ImportCandidateReader = () => Promise<ImportCandidate>;
-type BrowserStorageImportSource = "folder" | "zip";
 type WindowWithDirectoryPicker = Window & {
   showDirectoryPicker?: (options?: {
     id?: string;
@@ -75,6 +82,39 @@ function waitForNextPaint(): Promise<void> {
   });
 }
 
+function chooseWebkitFolder(): Promise<File[]> {
+  return new Promise((resolve) => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.multiple = true;
+    input.className = "hidden-input";
+    input.setAttribute("webkitdirectory", "");
+
+    function finish(files: File[]) {
+      input.remove();
+      resolve(files);
+    }
+
+    input.addEventListener(
+      "change",
+      () => {
+        finish(Array.from(input.files ?? []));
+      },
+      { once: true },
+    );
+    input.addEventListener(
+      "cancel",
+      () => {
+        finish([]);
+      },
+      { once: true },
+    );
+
+    document.body.append(input);
+    input.click();
+  });
+}
+
 async function requestLocalFolderPermission(gameId: string): Promise<boolean> {
   const handle = await getLocalFolderHandle(gameId);
   if (!handle) return false;
@@ -97,22 +137,15 @@ async function availableBrowserStorage(): Promise<number | undefined> {
 
 async function browserStorageError(
   requiredBytes: number,
-  source: BrowserStorageImportSource,
 ): Promise<string | undefined> {
   const availableBytes = await availableBrowserStorage();
   if (availableBytes === undefined || requiredBytes <= availableBytes)
     return undefined;
 
-  return browserStorageLimitMessage(source);
+  return browserStorageLimitMessage();
 }
 
-function browserStorageLimitMessage(
-  source: BrowserStorageImportSource,
-): string {
-  if (source === "folder") {
-    return "Browser storage limit exceeded.";
-  }
-
+function browserStorageLimitMessage(): string {
   return "Browser storage limit exceeded.";
 }
 
@@ -127,12 +160,9 @@ function isBrowserStorageLimitError(cause: unknown): boolean {
   );
 }
 
-function importErrorMessage(
-  cause: unknown,
-  source: BrowserStorageImportSource,
-): string {
+function importErrorMessage(cause: unknown): string {
   if (isBrowserStorageLimitError(cause)) {
-    return browserStorageLimitMessage(source);
+    return browserStorageLimitMessage();
   }
 
   return cause instanceof Error ? cause.message : "Import failed.";
@@ -143,19 +173,63 @@ export function useGameLibrary(onImportStart?: () => void) {
   const [activeGameId, setActiveGameId] = useState<string | null>(null);
   const [progress, setProgress] = useState<ImportProgress>(idleProgress);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [storage, setStorage] = useState<StorageEstimate | undefined>();
 
   const activeGame = useMemo(
     () => games.find((game) => game.id === activeGameId),
     [activeGameId, games],
   );
+  const boundSessionGameIds = useMemo(
+    () =>
+      new Set(
+        games
+          .filter(
+            (game) =>
+              game.sourceKind === "session-folder" && hasSessionFolder(game.id),
+          )
+          .map((game) => game.id),
+      ),
+    [games],
+  );
 
   useEffect(() => {
     void boot();
   }, []);
 
+  useEffect(() => {
+    function onServiceWorkerMessage(event: MessageEvent) {
+      if (event.data?.type !== "session-file-request") return;
+
+      const port = event.ports[0];
+      if (!port) return;
+
+      const gameId =
+        typeof event.data.gameId === "string" ? event.data.gameId : "";
+      const path = typeof event.data.path === "string" ? event.data.path : "";
+      const file = getSessionFolderFile(gameId, path);
+
+      port.postMessage({
+        type: "session-file-response",
+        ok: Boolean(file),
+        file,
+      });
+    }
+
+    navigator.serviceWorker?.addEventListener(
+      "message",
+      onServiceWorkerMessage,
+    );
+    return () =>
+      navigator.serviceWorker?.removeEventListener(
+        "message",
+        onServiceWorkerMessage,
+      );
+  }, []);
+
   async function boot() {
     setError(null);
+    setNotice(null);
     try {
       await registerPlayerServiceWorker();
       await refreshGames();
@@ -189,7 +263,25 @@ export function useGameLibrary(onImportStart?: () => void) {
     }
 
     try {
-      await runImport(async () => candidateFromFolder(files), "folder");
+      setError(null);
+      setNotice(null);
+      onImportStart?.();
+      setProgress({
+        phase: "reading",
+        label: "Reading folder",
+        completed: 0,
+        total: 1,
+      });
+      await waitForNextPaint();
+      const candidate = await candidateFromFolder(files);
+      const game = await importSessionFolderCandidate(candidate, setProgress);
+      registerSessionFolder(game.id, candidate.files);
+      clearServiceWorkerGameCache(game.id);
+      await refreshGames(game.id);
+      setProgress(idleProgress);
+    } catch (cause) {
+      setProgress(idleProgress);
+      setError(cause instanceof Error ? cause.message : "Folder open failed.");
     } finally {
       event.target.value = "";
     }
@@ -203,6 +295,7 @@ export function useGameLibrary(onImportStart?: () => void) {
     }
 
     setError(null);
+    setNotice(null);
     onImportStart?.();
     try {
       const picker = (window as WindowWithDirectoryPicker).showDirectoryPicker;
@@ -245,7 +338,7 @@ export function useGameLibrary(onImportStart?: () => void) {
       return;
     }
 
-    const compressedStorageError = await browserStorageError(file.size, "zip");
+    const compressedStorageError = await browserStorageError(file.size);
     if (compressedStorageError) {
       event.target.value = "";
       setError(compressedStorageError);
@@ -253,17 +346,15 @@ export function useGameLibrary(onImportStart?: () => void) {
     }
 
     try {
-      await runImport(async () => candidateFromZip(file, setProgress), "zip");
+      await runImport(async () => candidateFromZip(file, setProgress));
     } finally {
       event.target.value = "";
     }
   }
 
-  async function runImport(
-    readCandidate: ImportCandidateReader,
-    source: BrowserStorageImportSource,
-  ) {
+  async function runImport(readCandidate: ImportCandidateReader) {
     setError(null);
+    setNotice(null);
     onImportStart?.();
     try {
       setProgress({
@@ -274,10 +365,7 @@ export function useGameLibrary(onImportStart?: () => void) {
       });
       await waitForNextPaint();
       const candidate = await readCandidate();
-      const storageError = await browserStorageError(
-        candidate.totalBytes,
-        source,
-      );
+      const storageError = await browserStorageError(candidate.totalBytes);
       if (storageError) throw new Error(storageError);
       const game = await importCandidate(candidate, setProgress);
       clearServiceWorkerGameCache(game.id);
@@ -285,7 +373,7 @@ export function useGameLibrary(onImportStart?: () => void) {
       setProgress(idleProgress);
     } catch (cause) {
       setProgress(idleProgress);
-      setError(importErrorMessage(cause, source));
+      setError(importErrorMessage(cause));
     }
   }
 
@@ -299,7 +387,9 @@ export function useGameLibrary(onImportStart?: () => void) {
     if (!game) return;
 
     setError(null);
-    if ((game.sourceKind ?? "stored") === "local-folder") {
+    setNotice(null);
+    const sourceKind = game.sourceKind ?? "stored";
+    if (sourceKind === "local-folder") {
       try {
         if (!(await requestLocalFolderPermission(game.id))) {
           setError("Folder access expired. Open the folder again.");
@@ -310,19 +400,67 @@ export function useGameLibrary(onImportStart?: () => void) {
         return;
       }
     }
+    if (sourceKind === "session-folder" && !hasSessionFolder(game.id)) {
+      setError("Folder session expired.");
+      return;
+    }
 
     setActiveGameId(gameId);
   }
 
   async function removeGame(game: GameRecord) {
     setError(null);
+    setNotice(null);
     await deleteGame(game.id);
     clearGameStorageNamespace(game.id);
+    clearSessionFolder(game.id);
     clearServiceWorkerGameCache(game.id);
     const remaining = games.filter((item) => item.id !== game.id);
     setGames(remaining);
     setActiveGameId(remaining[0]?.id ?? null);
     setStorage(await estimateStorage());
+  }
+
+  async function bindSessionFolder(game: GameRecord) {
+    if (game.sourceKind !== "session-folder") {
+      setError("Only session folders need to be bound again.");
+      return;
+    }
+
+    setError(null);
+    setNotice(null);
+    onImportStart?.();
+    try {
+      const files = await chooseWebkitFolder();
+      if (files.length === 0) {
+        return;
+      }
+
+      setProgress({
+        phase: "reading",
+        label: "Binding folder",
+        completed: 0,
+        total: 1,
+      });
+      await waitForNextPaint();
+      const candidate = await candidateFromFolder(files);
+      if (candidate.title !== game.title) {
+        throw new Error(`Game mismatch.`);
+      }
+      const updated = await bindSessionFolderCandidate(
+        game,
+        candidate,
+        setProgress,
+      );
+      registerSessionFolder(updated.id, candidate.files);
+      clearServiceWorkerGameCache(updated.id);
+      await refreshGames(updated.id);
+      setNotice(`${updated.title} is bound.`);
+      setProgress(idleProgress);
+    } catch (cause) {
+      setProgress(idleProgress);
+      setError(cause instanceof Error ? cause.message : "Folder bind failed.");
+    }
   }
 
   async function downloadSaves(game: GameRecord) {
@@ -356,8 +494,10 @@ export function useGameLibrary(onImportStart?: () => void) {
   return {
     activeGame,
     activeGameId,
+    boundSessionGameIds,
     error,
     games,
+    notice,
     canUseLocalFolderAccess: supportsLocalFolderAccess(),
     importFolder,
     importZip,
@@ -365,9 +505,11 @@ export function useGameLibrary(onImportStart?: () => void) {
     progress,
     downloadSaves,
     removeGame,
+    bindSessionFolder,
     saveGameSettings,
     setActiveGameId: selectGame,
     setError,
+    setNotice,
     storage,
   };
 }

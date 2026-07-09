@@ -8,6 +8,7 @@ import {
   putIndexedDbBlobs,
   putLocalFolderHandle,
   putStoredFiles,
+  replaceStoredFilesForGame,
   supportsOpfs,
   type BrowserFileSystemDirectoryHandle,
   type BrowserFileSystemFileHandle,
@@ -24,6 +25,13 @@ interface LocalFolderCandidate {
   entryPath: string;
   totalBytes: number;
   directoryHandle: BrowserFileSystemDirectoryHandle;
+}
+
+export interface SessionFolderCandidate {
+  title: string;
+  files: Array<{ path: string; file: File; size: number; mime: string }>;
+  entryPath: string;
+  totalBytes: number;
 }
 
 type LocalFolderFileHandleEntry = {
@@ -53,7 +61,7 @@ function yieldToBrowser(): Promise<void> {
   return new Promise((resolve) => globalThis.setTimeout(resolve, 0));
 }
 
-export async function candidateFromFolder(files: FileList | File[]): Promise<ImportCandidate> {
+export async function candidateFromFolder(files: FileList | File[]): Promise<SessionFolderCandidate> {
   const entries = Array.from(files)
     .map((file) => ({
       path: normalizeStoredPath((file as File & { webkitRelativePath?: string }).webkitRelativePath || file.name),
@@ -63,12 +71,17 @@ export async function candidateFromFolder(files: FileList | File[]): Promise<Imp
 
   const normalized = stripCommonWrapper(entries);
   const paths = normalized.map((entry) => entry.path);
+  const sessionFiles = normalized.map((entry) => ({
+    ...entry,
+    size: entry.file.size,
+    mime: detectMime(entry.path),
+  }));
 
   return {
     title: titleFromEntry(entries.map((entry) => entry.path), "Imported Game"),
-    files: normalized,
+    files: sessionFiles,
     entryPath: findEntryPath(paths),
-    totalBytes: normalized.reduce((sum, entry) => sum + entry.file.size, 0)
+    totalBytes: sessionFiles.reduce((sum, entry) => sum + entry.size, 0)
   };
 }
 
@@ -277,4 +290,75 @@ export async function importLocalFolderCandidate(
   await putGame(game);
   onProgress?.({ phase: "done", label: "Folder linked", completed: candidate.files.length, total: candidate.files.length });
   return game;
+}
+
+export async function importSessionFolderCandidate(
+  candidate: SessionFolderCandidate,
+  onProgress?: ProgressCallback
+): Promise<GameRecord> {
+  const gameId = crypto.randomUUID();
+  const now = new Date().toISOString();
+
+  onProgress?.({ phase: "storing", label: "Saving folder session", completed: 0, total: candidate.files.length });
+
+  await putStoredFiles(
+    candidate.files.map((entry) => ({
+      gameId,
+      path: normalizeStoredPath(entry.path),
+      size: entry.size,
+      mime: entry.mime,
+      storageRef: normalizeStoredPath(entry.path),
+      storageKind: "session-file",
+    }))
+  );
+
+  const game: GameRecord = {
+    id: gameId,
+    title: candidate.title,
+    createdAt: now,
+    updatedAt: now,
+    entryPath: candidate.entryPath,
+    fileCount: candidate.files.length,
+    totalBytes: candidate.totalBytes,
+    sourceKind: "session-folder",
+    settings: defaultPlayerSettings(),
+  };
+
+  await putGame(game);
+  onProgress?.({ phase: "done", label: "Folder opened", completed: candidate.files.length, total: candidate.files.length });
+  return game;
+}
+
+export async function bindSessionFolderCandidate(
+  game: GameRecord,
+  candidate: SessionFolderCandidate,
+  onProgress?: ProgressCallback
+): Promise<GameRecord> {
+  const updatedGame: GameRecord = {
+    ...game,
+    title: candidate.title,
+    updatedAt: new Date().toISOString(),
+    entryPath: candidate.entryPath,
+    fileCount: candidate.files.length,
+    totalBytes: candidate.totalBytes,
+    sourceKind: "session-folder",
+  };
+
+  onProgress?.({ phase: "storing", label: "Binding folder session", completed: 0, total: candidate.files.length });
+
+  await replaceStoredFilesForGame(
+    game.id,
+    candidate.files.map((entry) => ({
+      gameId: game.id,
+      path: normalizeStoredPath(entry.path),
+      size: entry.size,
+      mime: entry.mime,
+      storageRef: normalizeStoredPath(entry.path),
+      storageKind: "session-file",
+    }))
+  );
+  await putGame(updatedGame);
+
+  onProgress?.({ phase: "done", label: "Folder bound", completed: candidate.files.length, total: candidate.files.length });
+  return updatedGame;
 }

@@ -200,6 +200,39 @@ export async function putStoredFiles(records: StoredGameFile[]): Promise<void> {
   }
 }
 
+export async function replaceStoredFilesForGame(
+  gameId: string,
+  records: StoredGameFile[],
+): Promise<void> {
+  const db = await openPlayerDb();
+  try {
+    const transaction = db.transaction([FILE_STORE, BLOB_STORE], "readwrite");
+    const fileStore = transaction.objectStore(FILE_STORE);
+    const blobStore = transaction.objectStore(BLOB_STORE);
+    const fileIndex = fileStore.index("gameId");
+    const fileRequest = fileIndex.openCursor(IDBKeyRange.only(gameId));
+
+    fileRequest.onsuccess = () => {
+      const cursor = fileRequest.result;
+      if (!cursor) {
+        for (const record of records) {
+          fileStore.put({ ...record, key: fileKey(record.gameId, record.path) });
+        }
+        return;
+      }
+
+      const record = cursor.value as StoredGameFile & { key: string };
+      blobStore.delete(record.key);
+      cursor.delete();
+      cursor.continue();
+    };
+
+    await transactionDone(transaction);
+  } finally {
+    db.close();
+  }
+}
+
 export async function putIndexedDbBlobs(records: Array<{ gameId: string; path: string; blob: Blob }>): Promise<StoredGameFile[]> {
   if (records.length === 0) return [];
 

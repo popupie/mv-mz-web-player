@@ -14,9 +14,11 @@ interface LibraryPanelProps {
   activeGame?: GameRecord;
   activeGuard: DictionaryDismissGuard;
   aboutOpen: boolean;
+  boundSessionGameIds: Set<string>;
   directoryInputRef: RefObject<HTMLInputElement | null>;
   error: string | null;
   games: GameRecord[];
+  notice: string | null;
   downloadSaves: (game: GameRecord) => void;
   openFolder: () => void;
   importFolder: (event: ChangeEvent<HTMLInputElement>) => void;
@@ -25,9 +27,11 @@ interface LibraryPanelProps {
   quotaPercent: number;
   recordingGuardTrigger: boolean;
   removeGame: (game: GameRecord) => void;
+  bindSessionFolder: (game: GameRecord) => void;
   removeGuardTrigger: (game: GameRecord, index: number) => void;
   recordGuardTrigger: (game: GameRecord, event: KeyboardEvent) => void;
   resetError: () => void;
+  resetNotice: () => void;
   setAboutOpen: (open: boolean | ((open: boolean) => boolean)) => void;
   setActiveGameId: (gameId: string) => void;
   setIdle: () => void;
@@ -41,9 +45,11 @@ export function LibraryPanel({
   activeGame,
   activeGuard,
   aboutOpen,
+  boundSessionGameIds,
   directoryInputRef,
   error,
   games,
+  notice,
   downloadSaves,
   openFolder,
   importFolder,
@@ -52,9 +58,11 @@ export function LibraryPanel({
   quotaPercent,
   recordingGuardTrigger,
   removeGame,
+  bindSessionFolder,
   removeGuardTrigger,
   recordGuardTrigger,
   resetError,
+  resetNotice,
   setAboutOpen,
   setActiveGameId,
   setIdle,
@@ -63,6 +71,12 @@ export function LibraryPanel({
   storage,
   zipInputRef,
 }: LibraryPanelProps) {
+  const storageUsage = storage?.usage ?? 0;
+  const storageQuota = storage?.quota ?? 0;
+  const storageText = storageQuota
+    ? `${formatBytes(storageUsage)} / ${formatBytes(storageQuota)}`
+    : formatBytes(storageUsage);
+
   return (
     <section className="library-panel" aria-label="Game library">
       <div className="sidebar-top">
@@ -147,13 +161,29 @@ export function LibraryPanel({
           </div>
         )}
 
+        {notice && (
+          <div className="notice dismissible-alert">
+            <span>{notice}</span>
+            <button
+              type="button"
+              aria-label="Dismiss notice"
+              title="Dismiss notice"
+              onClick={resetNotice}
+            >
+              <Icon name="x" />
+            </button>
+          </div>
+        )}
+
         {games.map((game) => (
           <GameCard
             key={game.id}
             active={game.id === activeGame?.id}
+            boundSession={boundSessionGameIds.has(game.id)}
             game={game}
             onDelete={removeGame}
             onDownloadSaves={downloadSaves}
+            onBindSessionFolder={bindSessionFolder}
             onSelect={setActiveGameId}
           />
         ))}
@@ -173,7 +203,7 @@ export function LibraryPanel({
         <div className="storage-meter">
           <div>
             <span>Browser storage</span>
-            <span>{storage?.usage ? formatBytes(storage.usage) : "0 B"}</span>
+            <span>{storageText}</span>
           </div>
           <progress value={quotaPercent} max={100} />
         </div>

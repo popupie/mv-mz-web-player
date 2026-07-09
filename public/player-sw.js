@@ -6,6 +6,7 @@ const BLOB_STORE = "blobs";
 const HANDLE_STORE = "handles";
 const PLAYER_DESKTOP_RUNTIME_VERSION = "desktop-api-1";
 const PLAYER_BRIDGE_RUNTIME_VERSION = "bridge-api-1";
+const SESSION_FILE_TIMEOUT_MS = 10000;
 let dbPromise;
 const gameCache = new Map();
 const fileCache = new Map();
@@ -157,7 +158,9 @@ function mojibakePathAliases(path) {
   if (!normalized) return [];
   const aliases = [];
   const seen = new Set([normalized]);
-  const slashCount = Array.from(normalized).filter((char) => char === "/").length;
+  const slashCount = Array.from(normalized).filter(
+    (char) => char === "/",
+  ).length;
 
   function addAlias(candidate) {
     if (!candidate) return;
@@ -299,6 +302,71 @@ async function getLocalFolderBlob(gameId, path) {
   }
 }
 
+function isPlayerClient(client) {
+  try {
+    return new URL(client.url).pathname.startsWith("/play/");
+  } catch {
+    return false;
+  }
+}
+
+function requestSessionFileFromClient(client, gameId, path) {
+  return new Promise((resolve) => {
+    const channel = new MessageChannel();
+    const timeout = setTimeout(() => {
+      channel.port1.onmessage = null;
+      resolve(undefined);
+    }, SESSION_FILE_TIMEOUT_MS);
+
+    channel.port1.onmessage = (event) => {
+      clearTimeout(timeout);
+      channel.port1.onmessage = null;
+      if (event.data && event.data.ok && event.data.file) {
+        resolve(event.data.file);
+        return;
+      }
+      resolve(undefined);
+    };
+
+    try {
+      client.postMessage(
+        {
+          type: "session-file-request",
+          gameId,
+          path,
+        },
+        [channel.port2],
+      );
+    } catch {
+      clearTimeout(timeout);
+      channel.port1.onmessage = null;
+      resolve(undefined);
+    }
+  });
+}
+
+async function getSessionFileBlob(gameId, path, requestClientId) {
+  const clientsList = await self.clients.matchAll({
+    type: "window",
+    includeUncontrolled: true,
+  });
+  const appClients = clientsList.filter((client) => !isPlayerClient(client));
+  const fallbackClients = clientsList.filter((client) =>
+    isPlayerClient(client),
+  );
+  const orderedClients = [
+    ...appClients.filter((client) => client.id === requestClientId),
+    ...appClients.filter((client) => client.id !== requestClientId),
+    ...fallbackClients,
+  ];
+
+  for (const client of orderedClients) {
+    const blob = await requestSessionFileFromClient(client, gameId, path);
+    if (blob) return blob;
+  }
+  return undefined;
+}
+
 async function serveGameFile(url, request) {
   if (request.method !== "GET" && request.method !== "HEAD") {
     return new Response("Method Not Allowed", { status: 405 });
@@ -319,10 +387,22 @@ async function serveGameFile(url, request) {
   const blob =
     record.storageKind === "local-folder"
       ? await getLocalFolderBlob(gameId, record.storageRef || record.path)
-      : record.storageKind === "opfs"
-        ? await getOpfsBlob(gameId, record.path)
-        : await getIndexedDbBlob(record.storageRef);
-  if (!blob) return new Response("File body not found", { status: 404 });
+      : record.storageKind === "session-file"
+        ? await getSessionFileBlob(
+            gameId,
+            record.storageRef || record.path,
+            request.clientId,
+          )
+        : record.storageKind === "opfs"
+          ? await getOpfsBlob(gameId, record.path)
+          : await getIndexedDbBlob(record.storageRef);
+  if (!blob) {
+    const message =
+      record.storageKind === "session-file"
+        ? "Folder session expired."
+        : "File body not found";
+    return new Response(message, { status: 404 });
+  }
 
   const headers = new Headers({
     "Content-Type": record.mime || blob.type || "application/octet-stream",
@@ -335,7 +415,10 @@ async function serveGameFile(url, request) {
   if ((record.mime || "").startsWith("text/html")) {
     const html = await blob.text();
     const files = await getGameFiles(gameId);
-    return new Response(injectBridge(html, game, files), { status: 200, headers });
+    return new Response(injectBridge(html, game, files), {
+      status: 200,
+      headers,
+    });
   }
 
   return new Response(blob, { status: 200, headers });

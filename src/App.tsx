@@ -156,9 +156,11 @@ export default function App() {
         activeGame={library.activeGame}
         activeGuard={activeDictionaryGuard}
         aboutOpen={aboutOpen}
+        boundSessionGameIds={library.boundSessionGameIds}
         directoryInputRef={directoryInputRef}
         error={library.error}
         games={library.games}
+        notice={library.notice}
         downloadSaves={(game) => void library.downloadSaves(game)}
         openFolder={() => {
           if (library.canUseLocalFolderAccess) {
@@ -173,9 +175,11 @@ export default function App() {
         quotaPercent={quotaPercent}
         recordingGuardTrigger={recordingGuardTrigger}
         removeGame={(game) => void library.removeGame(game)}
+        bindSessionFolder={(game) => void library.bindSessionFolder(game)}
         removeGuardTrigger={(game, index) => void removeGuardTrigger(game, index)}
         recordGuardTrigger={(game, event) => void recordGuardTrigger(game, event)}
         resetError={() => library.setError(null)}
+        resetNotice={() => library.setNotice(null)}
         setAboutOpen={setAboutOpen}
         setActiveGameId={library.setActiveGameId}
         setIdle={() => library.setActiveGameId(null)}

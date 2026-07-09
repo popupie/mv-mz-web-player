@@ -4,19 +4,54 @@ import { Icon } from "./Icon";
 
 interface GameCardProps {
   active: boolean;
+  boundSession: boolean;
   game: GameRecord;
   onDelete: (game: GameRecord) => void;
   onDownloadSaves: (game: GameRecord) => void;
+  onBindSessionFolder: (game: GameRecord) => void;
   onSelect: (gameId: string) => void;
 }
 
-export function GameCard({ active, game, onDelete, onDownloadSaves, onSelect }: GameCardProps) {
+function storageLabel(game: GameRecord, boundSession: boolean): string {
+  if (game.sourceKind === "local-folder") return "linked folder";
+  if (game.sourceKind === "session-folder")
+    return boundSession ? "bound" : "not bound";
+  return "stored";
+}
+
+export function GameCard({
+  active,
+  boundSession,
+  game,
+  onBindSessionFolder,
+  onDelete,
+  onDownloadSaves,
+  onSelect,
+}: GameCardProps) {
+  const canBindSession = game.sourceKind === "session-folder";
+  const unboundSession = canBindSession && !boundSession;
+  const className = [
+    "game-card",
+    active ? "active" : "",
+    unboundSession ? "unbound-session" : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+  const handleMainClick = () => {
+    if (unboundSession) {
+      onBindSessionFolder(game);
+      return;
+    }
+    onSelect(game.id);
+  };
+
   return (
-    <article className={active ? "game-card active" : "game-card"}>
-      <button type="button" className="game-main" onClick={() => onSelect(game.id)}>
+    <article className={className}>
+      <button type="button" className="game-main" onClick={handleMainClick}>
         <strong>{game.title}</strong>
         <span>
-          {game.fileCount} files · {formatBytes(game.totalBytes)}
+          {game.fileCount} files · {formatBytes(game.totalBytes)} ·{" "}
+          {storageLabel(game, boundSession)}
         </span>
       </button>
 
@@ -30,7 +65,12 @@ export function GameCard({ active, game, onDelete, onDownloadSaves, onSelect }: 
         <Icon name="download" />
       </button>
 
-      <button type="button" className="icon-button" aria-label={`Delete ${game.title}`} onClick={() => onDelete(game)}>
+      <button
+        type="button"
+        className="icon-button"
+        aria-label={`Delete ${game.title}`}
+        onClick={() => onDelete(game)}
+      >
         <Icon name="trash" />
       </button>
     </article>

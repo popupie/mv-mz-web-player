@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { candidateFromDirectoryHandle, decodeZipFileName } from "../src/lib/importer";
+import { candidateFromDirectoryHandle, candidateFromFolder, decodeZipFileName } from "../src/lib/importer";
 import type { BrowserFileSystemDirectoryHandle, BrowserFileSystemFileHandle } from "../src/lib/storage";
 
 function fileHandle(name: string, size: number): BrowserFileSystemFileHandle {
@@ -43,6 +43,15 @@ function directoryHandle(
   };
 }
 
+function webkitFile(path: string, size: number): File {
+  const name = path.split("/").at(-1) ?? path;
+  const file = new File([new Uint8Array(size)], name);
+  Object.defineProperty(file, "webkitRelativePath", {
+    value: path,
+  });
+  return file;
+}
+
 describe("ZIP filename decoding", () => {
   it("decodes UTF-8 names", () => {
     const bytes = new TextEncoder().encode("www/img/pictures/説明14.rpgmvp");
@@ -83,6 +92,28 @@ describe("folder handle scanning", () => {
       { path: "js/main.js", sourcePath: "Game/js/main.js", size: 20 },
       { path: "data/Actors.json", sourcePath: "Game/data/Actors.json", size: 30 },
     ]);
+    expect(candidate.totalBytes).toBe(60);
+  });
+});
+
+describe("webkit folder scanning", () => {
+  it("scans session metadata, strips a common wrapper, and keeps file references", async () => {
+    const files = [
+      webkitFile("Game/index.html", 10),
+      webkitFile("Game/js/main.js", 20),
+      webkitFile("Game/data/Actors.json", 30),
+    ];
+
+    const candidate = await candidateFromFolder(files);
+
+    expect(candidate.title).toBe("Game");
+    expect(candidate.entryPath).toBe("index.html");
+    expect(candidate.files).toMatchObject([
+      { path: "index.html", size: 10, mime: "text/html; charset=utf-8" },
+      { path: "js/main.js", size: 20, mime: "text/javascript; charset=utf-8" },
+      { path: "data/Actors.json", size: 30, mime: "application/json; charset=utf-8" },
+    ]);
+    expect(candidate.files.map((entry) => entry.file)).toEqual(files);
     expect(candidate.totalBytes).toBe(60);
   });
 });

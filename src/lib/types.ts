@@ -32,7 +32,7 @@ export interface PlayerSettings {
   readerMode: boolean;
 }
 
-export type GameSourceKind = "stored" | "local-folder";
+export type GameSourceKind = "stored" | "local-folder" | "session-folder";
 
 export interface GameRecord {
   id: string;
@@ -46,7 +46,7 @@ export interface GameRecord {
   settings: PlayerSettings;
 }
 
-export type StorageKind = "opfs" | "indexeddb" | "local-folder";
+export type StorageKind = "opfs" | "indexeddb" | "local-folder" | "session-file";
 
 export interface StoredGameFile {
   gameId: string;

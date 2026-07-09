@@ -243,6 +243,7 @@ progress::-moz-progress-bar {
 
 .storage-meter,
 .alert,
+.notice,
 .runtime-error,
 .guard-popover,
 .text-log-panel {
@@ -287,6 +288,14 @@ progress::-moz-progress-bar {
   word-break: break-word;
 }
 
+.notice {
+  border-color: #bbf7d0;
+  background: #f0fdf4;
+  color: #166534;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
 .runtime-error {
   align-self: stretch;
   flex: 0 0 auto;
@@ -298,7 +307,8 @@ progress::-moz-progress-bar {
   line-height: 1.35;
 }
 
-.library-panel .alert {
+.library-panel .alert,
+.library-panel .notice {
   font-size: 12px;
   line-height: 1.35;
 }
@@ -334,6 +344,10 @@ progress::-moz-progress-bar {
     opacity 0.14s ease;
 }
 
+.notice.dismissible-alert button {
+  color: #166534;
+}
+
 .dismissible-alert:hover button,
 .dismissible-alert:focus-within button {
   opacity: 1;
@@ -344,6 +358,12 @@ progress::-moz-progress-bar {
   border-color: transparent;
   background: rgba(190, 18, 60, 0.1);
   color: #be123c;
+}
+
+.notice.dismissible-alert button:hover,
+.notice.dismissible-alert button:focus-visible {
+  background: rgba(22, 101, 52, 0.1);
+  color: #166534;
 }
 
 .dismissible-alert .icon {
@@ -376,6 +396,14 @@ progress::-moz-progress-bar {
 .game-card.active {
   border-color: rgba(148, 163, 184, 0.34);
   background: var(--color-sidebar-hover);
+}
+
+.game-card.unbound-session {
+  border-color: rgba(251, 191, 36, 0.5);
+}
+
+.game-card.unbound-session .game-main span {
+  color: #fbbf24;
 }
 
 .game-card.importing {
