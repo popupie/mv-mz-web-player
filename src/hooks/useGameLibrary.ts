@@ -198,6 +198,26 @@ export function useGameLibrary(onImportStart?: () => void) {
   }, []);
 
   useEffect(() => {
+    if (!notice) return;
+
+    const timeoutId = window.setTimeout(() => {
+      setNotice(null);
+    }, 5000);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [notice]);
+
+  useEffect(() => {
+    if (!error) return;
+
+    const timeoutId = window.setTimeout(() => {
+      setError(null);
+    }, 5000);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [error]);
+
+  useEffect(() => {
     function onServiceWorkerMessage(event: MessageEvent) {
       if (event.data?.type !== "session-file-request") return;
 
