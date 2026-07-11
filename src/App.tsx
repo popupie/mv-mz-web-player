@@ -11,6 +11,7 @@ import type { DictionaryDismissGuard, GameRecord, PlayerToParentMessage } from "
 
 const textLogLimit = 100;
 const serviceTitle = "MV/MZ Web Player";
+const unsavedProgressWarning = "Leave the current game? Unsaved progress in the game may be lost.";
 
 export default function App() {
   const [runtimeError, setRuntimeError] = useState<string | null>(null);
@@ -63,6 +64,33 @@ export default function App() {
   useEffect(() => {
     document.title = library.activeGame ? `${library.activeGame.title} | ${serviceTitle}` : serviceTitle;
   }, [library.activeGame]);
+
+  useEffect(() => {
+    if (!library.activeGame) return;
+
+    const onBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [library.activeGame]);
+
+  function confirmLeavingActiveGame(nextGameId: string | null) {
+    if (!library.activeGame || library.activeGame.id === nextGameId) return true;
+    return window.confirm(unsavedProgressWarning);
+  }
+
+  async function selectGame(gameId: string) {
+    if (!confirmLeavingActiveGame(gameId)) return;
+    await library.setActiveGameId(gameId);
+  }
+
+  async function returnHome() {
+    if (!confirmLeavingActiveGame(null)) return;
+    await library.setActiveGameId(null);
+  }
 
   async function setGameSettings(game: GameRecord, patch: Partial<GameRecord["settings"]>) {
     const updated = await library.saveGameSettings(game, patch);
@@ -169,8 +197,8 @@ export default function App() {
         recordGuardTrigger={(game, event) => void recordGuardTrigger(game, event)}
         resetError={() => library.setError(null)}
         resetNotice={() => library.setNotice(null)}
-        setActiveGameId={library.setActiveGameId}
-        setIdle={() => library.setActiveGameId(null)}
+        setActiveGameId={(gameId) => void selectGame(gameId)}
+        setIdle={() => void returnHome()}
         setDictionaryGuard={(game, guard) => void setDictionaryGuard(game, guard)}
         setRecordingGuardTrigger={setRecordingGuardTrigger}
         storage={library.storage}
