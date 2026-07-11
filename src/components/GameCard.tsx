@@ -13,10 +13,22 @@ interface GameCardProps {
 }
 
 function storageLabel(game: GameRecord, boundSession: boolean): string {
-  if (game.sourceKind === "local-folder") return "linked folder";
+  if (game.sourceKind === "local-folder")
+    return "linked folder, no browser storage";
   if (game.sourceKind === "session-folder")
     return boundSession ? "bound" : "not bound";
   return "stored";
+}
+
+function detailsLabel(game: GameRecord, boundSession: boolean): string {
+  const label = storageLabel(game, boundSession);
+  if (
+    game.sourceKind === "local-folder" ||
+    game.sourceKind === "session-folder"
+  ) {
+    return `${game.fileCount} files · ${label}`;
+  }
+  return `${game.fileCount} files · ${formatBytes(game.totalBytes)} · ${label}`;
 }
 
 export function GameCard({
@@ -49,10 +61,7 @@ export function GameCard({
     <article className={className}>
       <button type="button" className="game-main" onClick={handleMainClick}>
         <strong>{game.title}</strong>
-        <span>
-          {game.fileCount} files · {formatBytes(game.totalBytes)} ·{" "}
-          {storageLabel(game, boundSession)}
-        </span>
+        <span>{detailsLabel(game, boundSession)}</span>
       </button>
 
       <button

@@ -13,7 +13,6 @@ import { ImportProgressCard } from "./ImportProgressCard";
 interface LibraryPanelProps {
   activeGame?: GameRecord;
   activeGuard: DictionaryDismissGuard;
-  aboutOpen: boolean;
   boundSessionGameIds: Set<string>;
   directoryInputRef: RefObject<HTMLInputElement | null>;
   error: string | null;
@@ -33,7 +32,6 @@ interface LibraryPanelProps {
   recordGuardTrigger: (game: GameRecord, event: KeyboardEvent) => void;
   resetError: () => void;
   resetNotice: () => void;
-  setAboutOpen: (open: boolean | ((open: boolean) => boolean)) => void;
   setActiveGameId: (gameId: string) => void;
   setIdle: () => void;
   setDictionaryGuard: (game: GameRecord, guard: DictionaryDismissGuard) => void;
@@ -45,7 +43,6 @@ interface LibraryPanelProps {
 export function LibraryPanel({
   activeGame,
   activeGuard,
-  aboutOpen,
   boundSessionGameIds,
   directoryInputRef,
   error,
@@ -65,7 +62,6 @@ export function LibraryPanel({
   recordGuardTrigger,
   resetError,
   resetNotice,
-  setAboutOpen,
   setActiveGameId,
   setIdle,
   setDictionaryGuard,
@@ -89,22 +85,12 @@ export function LibraryPanel({
           <div className="brand-actions">
             <button
               type="button"
-              className="icon-button info-button"
+              className="icon-button nav-button"
               aria-label="Home"
               title="Home"
               onClick={setIdle}
             >
               <Icon name="home" />
-            </button>
-            <button
-              type="button"
-              className="icon-button info-button"
-              aria-label="About"
-              title="About"
-              aria-pressed={aboutOpen}
-              onClick={() => setAboutOpen((open) => !open)}
-            >
-              <Icon name="info" />
             </button>
           </div>
         </div>
@@ -112,8 +98,8 @@ export function LibraryPanel({
         <div className="import-actions">
           <button
             type="button"
-            aria-label="Open folder"
-            title="Open folder"
+            aria-label="Open folder without using browser storage"
+            title="Open folder without using browser storage"
             onClick={openFolder}
           >
             <Icon name="folder" />

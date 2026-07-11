@@ -217,7 +217,7 @@ progress::-moz-progress-bar {
   flex: 0 0 auto;
 }
 
-.info-button {
+.nav-button {
   width: 32px;
   height: 32px;
   min-height: 32px;
@@ -481,6 +481,10 @@ progress::-moz-progress-bar {
   background: var(--color-background-muted);
 }
 
+.home-player-panel {
+  justify-content: center;
+}
+
 .player-toolbar {
   display: flex;
   align-items: center;
@@ -545,6 +549,142 @@ progress::-moz-progress-bar {
 
 .show-mode-button {
   animation: show-mode-enter 0.18s ease-out;
+}
+
+.home-guide {
+  display: grid;
+  align-content: start;
+  gap: 18px;
+  width: min(760px, 100%);
+  max-height: 100%;
+  margin: auto;
+  padding: clamp(22px, 5vh, 44px) 24px;
+  overflow: auto;
+}
+
+.home-guide-intro {
+  display: grid;
+  gap: 8px;
+  max-width: 620px;
+  padding-bottom: 4px;
+}
+
+.home-guide h2 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 22px;
+  line-height: 1.15;
+}
+
+.home-guide h3 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 14px;
+  line-height: 1.25;
+}
+
+.home-guide p,
+.home-guide span {
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.home-action-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.home-instruction-card {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  min-height: 98px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 12px;
+  background: var(--color-background);
+}
+
+.home-control-preview {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  color: var(--text-primary);
+  background: var(--color-background-muted);
+}
+
+.home-instruction-card > div,
+.home-guide-section {
+  display: grid;
+  gap: 8px;
+}
+
+.home-secondary-grid {
+  display: grid;
+}
+
+.home-guide-section {
+  border-top: 1px solid var(--color-border);
+  padding-top: 14px;
+}
+
+.home-controls-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 12px;
+}
+
+.home-controls-grid h3 {
+  padding: 0 2px 2px;
+}
+
+.home-control-cell {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  align-items: start;
+  gap: 9px;
+  min-height: 52px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 10px;
+  background: var(--color-background);
+}
+
+.home-control-cell .icon {
+  width: 18px;
+  height: 18px;
+  margin: 1px auto 0;
+  color: var(--text-primary);
+}
+
+.home-control-cell-empty {
+  border-color: transparent;
+  background: transparent;
+}
+
+.home-control-cell-empty::before {
+  content: "";
+  display: block;
+}
+
+.home-guide-note {
+  gap: 7px;
+}
+
+.home-guide a {
+  color: var(--color-accent);
+  text-decoration: none;
+}
+
+.home-guide a:hover {
+  text-decoration: underline;
 }
 
 @keyframes show-mode-enter {
@@ -812,79 +952,6 @@ iframe:focus-visible {
   color: var(--text-secondary);
 }
 
-.modal-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 1000;
-  display: grid;
-  place-items: center;
-  padding: 20px;
-  background: rgba(0, 0, 0, 0.68);
-}
-
-.about-modal {
-  display: grid;
-  gap: 16px;
-  width: min(520px, 100%);
-  max-height: min(720px, calc(100vh - 40px));
-  overflow: auto;
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  padding: 18px;
-  background: var(--color-background);
-  box-shadow: 0 18px 60px rgba(15, 23, 42, 0.24);
-}
-
-.modal-header {
-  display: flex;
-  align-items: start;
-  justify-content: space-between;
-  gap: 16px;
-  padding-bottom: 14px;
-  border-bottom: 1px solid var(--color-border);
-}
-
-.modal-header button {
-  min-height: 34px;
-  padding: 0 12px;
-}
-
-.modal-section {
-  display: grid;
-  gap: 8px;
-}
-
-.modal-section h3 {
-  margin: 0;
-  color: var(--text-primary);
-  font-size: 13px;
-  line-height: 1.2;
-}
-
-.modal-section p,
-.modal-section li {
-  color: var(--text-secondary);
-  font-size: 13px;
-  line-height: 1.4;
-}
-
-.modal-section ol {
-  display: grid;
-  gap: 6px;
-  margin: 0;
-  padding-left: 20px;
-}
-
-.modal-section a {
-  color: var(--color-accent);
-  font-size: 13px;
-  text-decoration: none;
-}
-
-.modal-section a:hover {
-  text-decoration: underline;
-}
-
 @media (max-width: 860px) {
   .app-shell {
     grid-template-columns: 1fr;
@@ -907,5 +974,23 @@ iframe:focus-visible {
   .player-panel {
     height: auto;
     min-height: 0;
+  }
+
+  .home-player-panel {
+    justify-content: flex-start;
+  }
+
+  .home-guide {
+    width: 100%;
+    margin: 0 auto;
+    padding: 20px 16px;
+  }
+
+  .home-action-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .home-controls-grid {
+    gap: 9px 12px;
   }
 }

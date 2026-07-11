@@ -9,7 +9,6 @@ export type IconName =
   | "folder"
   | "fullscreen"
   | "home"
-  | "info"
   | "layers"
   | "logs"
   | "plus"
@@ -63,13 +62,6 @@ export function Icon({ name }: { name: IconName }) {
         <path d="m3 11 9-8 9 8" />
         <path d="M5 10v10h14V10" />
         <path d="M9 20v-6h6v6" />
-      </>
-    ),
-    info: (
-      <>
-        <circle cx="12" cy="12" r="9" />
-        <path d="M12 11v5" />
-        <path d="M12 8h.01" />
       </>
     ),
     layers: (

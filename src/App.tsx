@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
-import { AboutModal } from "./components/AboutModal";
 import { LibraryPanel } from "./components/LibraryPanel";
 import { PlayerPanel } from "./components/PlayerPanel";
 import { useGameLibrary } from "./hooks/useGameLibrary";
@@ -15,7 +14,6 @@ const serviceTitle = "MV/MZ Web Player";
 
 export default function App() {
   const [runtimeError, setRuntimeError] = useState<string | null>(null);
-  const [aboutOpen, setAboutOpen] = useState(false);
   const [recordingGuardTrigger, setRecordingGuardTrigger] = useState(false);
   const directoryInputRef = useRef<HTMLInputElement>(null);
   const zipInputRef = useRef<HTMLInputElement>(null);
@@ -65,15 +63,6 @@ export default function App() {
   useEffect(() => {
     document.title = library.activeGame ? `${library.activeGame.title} | ${serviceTitle}` : serviceTitle;
   }, [library.activeGame]);
-
-  useEffect(() => {
-    if (!aboutOpen) return;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.code === "Escape") setAboutOpen(false);
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [aboutOpen]);
 
   async function setGameSettings(game: GameRecord, patch: Partial<GameRecord["settings"]>) {
     const updated = await library.saveGameSettings(game, patch);
@@ -155,7 +144,6 @@ export default function App() {
       <LibraryPanel
         activeGame={library.activeGame}
         activeGuard={activeDictionaryGuard}
-        aboutOpen={aboutOpen}
         boundSessionGameIds={library.boundSessionGameIds}
         directoryInputRef={directoryInputRef}
         error={library.error}
@@ -181,7 +169,6 @@ export default function App() {
         recordGuardTrigger={(game, event) => void recordGuardTrigger(game, event)}
         resetError={() => library.setError(null)}
         resetNotice={() => library.setNotice(null)}
-        setAboutOpen={setAboutOpen}
         setActiveGameId={library.setActiveGameId}
         setIdle={() => library.setActiveGameId(null)}
         setDictionaryGuard={(game, guard) => void setDictionaryGuard(game, guard)}
@@ -207,8 +194,6 @@ export default function App() {
         textLogLimit={textLogLimit}
         textLogs={textLogs}
       />
-
-      {aboutOpen && <AboutModal onClose={() => setAboutOpen(false)} />}
     </main>
   );
 }
