@@ -819,7 +819,15 @@ function decryptRpgMakerAsset(bytes, key) {
   return body;
 }
 
+function isExactAssetRequestMatch(match) {
+  return normalizePath(match.requestedPath) === normalizePath(match.matchedPath);
+}
+
 async function transformAssetBlobForRequest(gameId, match, blob, requestClientId) {
+  if (isExactAssetRequestMatch(match)) {
+    return { blob };
+  }
+
   const encryptedPlainExtension = encryptedRequestPlainFallbackExtension(
     match.requestedPath,
     match.matchedPath,

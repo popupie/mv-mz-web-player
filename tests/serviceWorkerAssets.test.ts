@@ -94,4 +94,35 @@ describe("service worker RPG Maker asset helpers", () => {
     expect(encrypted.slice(16, 32)).not.toEqual(plainBytes.slice(0, 16));
     expect(helpers.decryptRpgMakerAsset(encrypted, key)).toEqual(plainBytes);
   });
+
+  it("passes through exact asset requests across compatibility extensions", async () => {
+    const helpers = loadServiceWorkerHelpers();
+    const bytes = Uint8Array.from([0x52, 0x50, 0x47, 0x4d, 0x56, 0, 0, 0, 0, 3, 1, 0, 1, 2, 3, 4]);
+    const paths = [
+      "www/img/system/Window.png_",
+      "www/img/system/Window.png__",
+      "www/img/system/Window.png___",
+      "www/img/pictures/Logo.rpgmvp",
+      "www/audio/bgm/Theme.ogg_",
+      "www/audio/bgm/Theme.ogg__",
+      "www/audio/bgm/Theme.ogg___",
+      "www/audio/bgm/Theme.rpgmvo",
+      "www/audio/bgm/Theme.rpgmvm",
+      "www/movies/Opening.webm_",
+      "www/movies/Opening.mp4__",
+    ];
+
+    for (const path of paths) {
+      const blob = new Blob([bytes], { type: "application/octet-stream" });
+      const result = await helpers.transformAssetBlobForRequest(
+        "game-1",
+        { requestedPath: path, matchedPath: path },
+        blob,
+        undefined,
+      );
+
+      expect(result.error, path).toBeUndefined();
+      expect(new Uint8Array(await result.blob.arrayBuffer()), path).toEqual(bytes);
+    }
+  });
 });
