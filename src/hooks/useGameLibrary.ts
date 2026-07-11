@@ -8,17 +8,22 @@ import {
   importSessionFolderCandidate,
   bindSessionFolderCandidate,
 } from "../lib/importer";
-import { clearGameStorageNamespace } from "../lib/keys";
+import {
+  clearAllGameStorageNamespaces,
+  clearGameStorageNamespace,
+} from "../lib/keys";
 import { normalizePlayerSettings } from "../lib/playerSettings";
 import { downloadSaveZip } from "../lib/saveExport";
 import { registerPlayerServiceWorker } from "../lib/serviceWorker";
 import {
+  clearAllSessionFolders,
   clearSessionFolder,
   getSessionFolderFile,
   hasSessionFolder,
   registerSessionFolder,
 } from "../lib/sessionFiles";
 import {
+  clearPlayerStorage,
   deleteGame,
   estimateStorage,
   getAllGames,
@@ -35,6 +40,8 @@ export const idleProgress: ImportProgress = {
   total: 0,
 };
 
+const storageEstimateRetryDelaysMs = [0, 50, 150, 350, 750, 1500, 2500];
+
 type ImportCandidateReader = () => Promise<ImportCandidate>;
 type WindowWithDirectoryPicker = Window & {
   showDirectoryPicker?: (options?: {
@@ -47,6 +54,37 @@ function clearServiceWorkerGameCache(gameId: string) {
   navigator.serviceWorker.controller?.postMessage({
     type: "clear-game-cache",
     gameId,
+  });
+}
+
+function clearServiceWorkerPlayerCache(): Promise<void> {
+  return new Promise((resolve) => {
+    const controller = navigator.serviceWorker.controller;
+    if (!controller || typeof MessageChannel === "undefined") {
+      resolve();
+      return;
+    }
+
+    const channel = new MessageChannel();
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timeoutId);
+      channel.port1.close();
+      resolve();
+    };
+    const timeoutId = window.setTimeout(finish, 1500);
+    channel.port1.onmessage = () => {
+      finish();
+    };
+    try {
+      controller.postMessage({
+        type: "clear-player-cache",
+      }, [channel.port2]);
+    } catch {
+      finish();
+    }
   });
 }
 
@@ -80,6 +118,34 @@ function waitForNextPaint(): Promise<void> {
     }
     globalThis.setTimeout(resolve, 0);
   });
+}
+
+function wait(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    globalThis.setTimeout(resolve, ms);
+  });
+}
+
+async function estimateStorageAfterMutation(
+  previous?: StorageEstimate,
+): Promise<StorageEstimate | undefined> {
+  const previousUsage =
+    typeof previous?.usage === "number" ? previous.usage : undefined;
+  let latest: StorageEstimate | undefined;
+
+  for (const delayMs of storageEstimateRetryDelaysMs) {
+    if (delayMs > 0) await wait(delayMs);
+    latest = await estimateStorage();
+    if (
+      previousUsage === undefined ||
+      typeof latest?.usage !== "number" ||
+      latest.usage < previousUsage
+    ) {
+      return latest;
+    }
+  }
+
+  return latest;
 }
 
 function chooseWebkitFolder(): Promise<File[]> {
@@ -441,6 +507,29 @@ export function useGameLibrary(onImportStart?: () => void) {
     setStorage(await estimateStorage());
   }
 
+  async function clearStorage() {
+    const confirmed = window.confirm(
+      "Clear all imported games, saves, and folder bindings stored by this player in this browser?",
+    );
+    if (!confirmed) return;
+
+    const previousStorage = storage;
+    setError(null);
+    setNotice(null);
+    try {
+      await clearServiceWorkerPlayerCache();
+      await clearPlayerStorage();
+      clearAllGameStorageNamespaces();
+      clearAllSessionFolders();
+      setGames([]);
+      setActiveGameId(null);
+      setStorage(await estimateStorageAfterMutation(previousStorage));
+      setNotice("Storage cleared.");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Storage clear failed.");
+    }
+  }
+
   async function bindSessionFolder(game: GameRecord) {
     if (game.sourceKind !== "session-folder") {
       setError("Only session folders need to be bound again.");
@@ -525,6 +614,7 @@ export function useGameLibrary(onImportStart?: () => void) {
     progress,
     downloadSaves,
     removeGame,
+    clearStorage,
     bindSessionFolder,
     saveGameSettings,
     setActiveGameId: selectGame,

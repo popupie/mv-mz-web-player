@@ -160,6 +160,36 @@ export async function deleteGame(gameId: string): Promise<void> {
   await removeOpfsGame(gameId);
 }
 
+export async function clearPlayerStorage(): Promise<void> {
+  await deletePlayerDb();
+  await removeOpfsGames();
+}
+
+function deletePlayerDb(): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.deleteDatabase(DB_NAME);
+    const timeoutId = globalThis.setTimeout(() => {
+      reject(
+        new Error(
+          "Storage is still open in another tab. Close other MV/MZ Web Player tabs and try again.",
+        ),
+      );
+    }, 5000);
+
+    request.onsuccess = () => {
+      globalThis.clearTimeout(timeoutId);
+      resolve();
+    };
+    request.onerror = () => {
+      globalThis.clearTimeout(timeoutId);
+      reject(request.error ?? new Error("Could not clear browser storage."));
+    };
+    request.onblocked = () => {
+      // Give open service workers and tabs a chance to close their database handles.
+    };
+  });
+}
+
 export async function putLocalFolderHandle(gameId: string, handle: BrowserFileSystemDirectoryHandle): Promise<void> {
   const db = await openPlayerDb();
   try {
@@ -369,6 +399,16 @@ async function removeOpfsGame(gameId: string): Promise<void> {
     if (!root) return;
     const gamesDir = await root.getDirectoryHandle("games");
     await gamesDir.removeEntry(gameId, { recursive: true });
+  } catch {
+    // OPFS cleanup is best-effort because older browsers can store only in IndexedDB.
+  }
+}
+
+async function removeOpfsGames(): Promise<void> {
+  try {
+    const root = await getOpfsRoot();
+    if (!root) return;
+    await root.removeEntry("games", { recursive: true });
   } catch {
     // OPFS cleanup is best-effort because older browsers can store only in IndexedDB.
   }

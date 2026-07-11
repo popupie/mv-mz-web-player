@@ -161,6 +161,7 @@ export default function App() {
         error={library.error}
         games={library.games}
         notice={library.notice}
+        clearStorage={() => void library.clearStorage()}
         downloadSaves={(game) => void library.downloadSaves(game)}
         openFolder={() => {
           if (library.canUseLocalFolderAccess) {

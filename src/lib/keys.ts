@@ -25,6 +25,14 @@ export type RemovableStorage = Pick<Storage, "key" | "length" | "removeItem">;
 
 export function clearGameStorageNamespace(gameId: string, storage: RemovableStorage = window.localStorage): void {
   const prefix = storageNamespace(gameId);
+  clearStorageKeysWithPrefix(prefix, storage);
+}
+
+export function clearAllGameStorageNamespaces(storage: RemovableStorage = window.localStorage): void {
+  clearStorageKeysWithPrefix("mz-player:", storage);
+}
+
+function clearStorageKeysWithPrefix(prefix: string, storage: RemovableStorage): void {
   const keys: string[] = [];
 
   for (let index = 0; index < storage.length; index += 1) {

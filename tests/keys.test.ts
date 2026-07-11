@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { defaultPlayerSettings } from "../src/lib/defaults";
-import { clearGameStorageNamespace, matchesReservedKey, namespaceStorageKey, reservedKeyForEvent, unnamespaceStorageKey } from "../src/lib/keys";
+import { clearAllGameStorageNamespaces, clearGameStorageNamespace, matchesReservedKey, namespaceStorageKey, reservedKeyForEvent, unnamespaceStorageKey } from "../src/lib/keys";
 import { dictionaryGuardFor, normalizeDictionaryDismissGuard, normalizePlayerSettings, overlayTogglePatch, showTogglePatch } from "../src/lib/playerSettings";
 import type { GameRecord, PlayerSettings } from "../src/lib/types";
 
@@ -163,5 +163,16 @@ describe("localStorage namespacing", () => {
       [namespaceStorageKey("game-b", "RPG File1"), "save-b"],
       ["unrelated", "keep"],
     ]);
+  });
+
+  it("clears all player localStorage namespaces", () => {
+    const storage = createMemoryStorage();
+    storage.setItem(namespaceStorageKey("game-a", "RPG File1"), "save-a");
+    storage.setItem(namespaceStorageKey("game-b", "RPG File1"), "save-b");
+    storage.setItem("unrelated", "keep");
+
+    clearAllGameStorageNamespaces(storage);
+
+    expect(storage.entries()).toEqual([["unrelated", "keep"]]);
   });
 });

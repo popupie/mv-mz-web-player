@@ -176,7 +176,7 @@ progress::-moz-progress-bar {
 }
 
 .brand-row > div:first-child,
-.storage-meter span:first-child {
+.storage-meter-header > span:first-child {
   min-width: 0;
 }
 
@@ -266,7 +266,7 @@ progress::-moz-progress-bar {
 }
 
 .library-panel .guard-row > span,
-.library-panel .storage-meter span:first-child {
+.library-panel .storage-meter-header > span:first-child {
   font-size: 12px;
   font-weight: 600;
 }
@@ -452,6 +452,21 @@ progress::-moz-progress-bar {
   padding: 10px;
   color: var(--text-secondary);
   font-size: 12px;
+}
+
+.storage-meter-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  min-width: 0;
+}
+
+.storage-clear-button {
+  width: 30px;
+  height: 30px;
+  min-height: 30px;
+  color: #fca5a5;
 }
 
 .player-panel {

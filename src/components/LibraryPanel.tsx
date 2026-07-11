@@ -19,6 +19,7 @@ interface LibraryPanelProps {
   error: string | null;
   games: GameRecord[];
   notice: string | null;
+  clearStorage: () => void;
   downloadSaves: (game: GameRecord) => void;
   openFolder: () => void;
   importFolder: (event: ChangeEvent<HTMLInputElement>) => void;
@@ -50,6 +51,7 @@ export function LibraryPanel({
   error,
   games,
   notice,
+  clearStorage,
   downloadSaves,
   openFolder,
   importFolder,
@@ -203,7 +205,18 @@ export function LibraryPanel({
         <div className="storage-meter">
           <div className="storage-meter-header">
             <span>Browser storage</span>
-            <span>{storageText}</span>
+            <div className="storage-meter-actions">
+              <span>{storageText}</span>
+              <button
+                type="button"
+                className="icon-button storage-clear-button"
+                aria-label="Clear storage"
+                title="Clear storage"
+                onClick={clearStorage}
+              >
+                <Icon name="trash" />
+              </button>
+            </div>
           </div>
           <progress value={quotaPercent} max={100} />
         </div>

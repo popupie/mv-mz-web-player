@@ -23,6 +23,10 @@ export function clearSessionFolder(gameId: string): void {
   sessionFolders.delete(gameId);
 }
 
+export function clearAllSessionFolders(): void {
+  sessionFolders.clear();
+}
+
 export function hasSessionFolder(gameId: string): boolean {
   return sessionFolders.has(gameId);
 }
