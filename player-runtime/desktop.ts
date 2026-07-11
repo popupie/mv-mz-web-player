@@ -12,24 +12,169 @@ import { createPathRuntime } from "./desktop/path";
   }
   const manifestUrlByRawReference = new Map();
 
-  function addRawAssetReference(reference, url) {
-    if (!reference || manifestUrlByRawReference.has(reference)) return;
-    manifestUrlByRawReference.set(reference, url);
+  function addRawAssetReference(reference, url, priority = 1) {
+    if (!reference) return;
+    const existing = manifestUrlByRawReference.get(reference);
+    if (existing && existing.priority <= priority) return;
+    manifestUrlByRawReference.set(reference, { priority, url });
+  }
+
+  function addAssetReferenceVariants(reference, url, priority = 1) {
+    addRawAssetReference(reference, url, priority);
+    addRawAssetReference("./" + reference, url, priority);
+    addRawAssetReference("/" + reference.replace(/^\/+/, ""), url, priority);
+  }
+
+  function addFileRouteReference(reference, url, priority = 1) {
+    addRawAssetReference(
+      config.fileRoutePrefix + reference.replace(/^\/+/, ""),
+      url,
+      priority,
+    );
+  }
+
+  function encodedFileRouteUrl(path) {
+    return (
+      config.fileRoutePrefix +
+      String(path)
+        .replace(/\\+/g, "/")
+        .replace(/^\/+/, "")
+        .split("/")
+        .map(encodeURIComponent)
+        .join("/")
+    );
+  }
+
+  function pathWithExtension(path, extension) {
+    const index = path.lastIndexOf(".");
+    if (index < 0) return null;
+    return path.slice(0, index) + extension;
+  }
+
+  function suffixedPathCandidates(path) {
+    return [path + "_", path + "__", path + "___"];
+  }
+
+  function pathWithoutSuffixMarkers(path) {
+    return path.replace(/_+$/u, "");
+  }
+
+  const plainImageExtensions = [".png", ".jpg", ".jpeg", ".webp", ".gif"];
+  const encryptedImageSuffixes = [".png_", ".png__", ".png___"];
+  const plainAudioExtensions = [".ogg", ".m4a", ".mp3", ".wav", ".oga"];
+  const encryptedAudioExtensions = [".rpgmvo", ".rpgmvm"];
+  const plainVideoExtensions = [".webm", ".mp4"];
+
+  function rpgMakerAssetReferenceAliases(path) {
+    const lowerPath = path.toLowerCase();
+    const unsuffixedPath = pathWithoutSuffixMarkers(path);
+    const lowerUnsuffixedPath = unsuffixedPath.toLowerCase();
+    const candidates = [];
+
+    function add(candidate) {
+      if (candidate && candidate !== path && !candidates.includes(candidate)) {
+        candidates.push(candidate);
+      }
+    }
+
+    for (const imageExtension of plainImageExtensions) {
+      if (!lowerPath.endsWith(imageExtension)) continue;
+      const stem = path.slice(0, -imageExtension.length);
+      add(stem + ".rpgmvp");
+      if (imageExtension === ".png") {
+        for (const encryptedSuffix of encryptedImageSuffixes) add(stem + encryptedSuffix);
+      }
+      return candidates;
+    }
+
+    if (lowerPath.endsWith(".rpgmvp")) {
+      for (const encryptedSuffix of encryptedImageSuffixes) add(pathWithExtension(path, encryptedSuffix));
+      for (const imageExtension of plainImageExtensions) add(pathWithExtension(path, imageExtension));
+      return candidates;
+    }
+
+    for (const encryptedSuffix of encryptedImageSuffixes) {
+      if (!lowerPath.endsWith(encryptedSuffix)) continue;
+      const stem = path.slice(0, -encryptedSuffix.length);
+      add(stem + ".rpgmvp");
+      for (const candidateSuffix of encryptedImageSuffixes) add(stem + candidateSuffix);
+      for (const imageExtension of plainImageExtensions) add(stem + imageExtension);
+      return candidates;
+    }
+
+    if (plainAudioExtensions.some((extension) => lowerUnsuffixedPath.endsWith(extension))) {
+      add(unsuffixedPath);
+      for (const candidate of suffixedPathCandidates(unsuffixedPath)) add(candidate);
+      for (const encryptedExtension of encryptedAudioExtensions) {
+        const encryptedPath = pathWithExtension(unsuffixedPath, encryptedExtension);
+        add(encryptedPath);
+        if (encryptedPath) {
+          for (const candidate of suffixedPathCandidates(encryptedPath)) add(candidate);
+        }
+      }
+      return candidates;
+    }
+
+    if (encryptedAudioExtensions.some((extension) => lowerUnsuffixedPath.endsWith(extension))) {
+      add(unsuffixedPath);
+      for (const candidate of suffixedPathCandidates(unsuffixedPath)) add(candidate);
+      for (const plainExtension of plainAudioExtensions) {
+        const plainPath = pathWithExtension(unsuffixedPath, plainExtension);
+        add(plainPath);
+        if (plainPath) {
+          for (const candidate of suffixedPathCandidates(plainPath)) add(candidate);
+        }
+      }
+      return candidates;
+    }
+
+    if (plainVideoExtensions.some((extension) => lowerUnsuffixedPath.endsWith(extension))) {
+      add(unsuffixedPath);
+      for (const candidate of suffixedPathCandidates(unsuffixedPath)) add(candidate);
+      for (const videoExtension of plainVideoExtensions) {
+        const videoPath = pathWithExtension(unsuffixedPath, videoExtension);
+        add(videoPath);
+        if (videoPath) {
+          for (const candidate of suffixedPathCandidates(videoPath)) {
+            add(candidate);
+          }
+        }
+      }
+      return candidates;
+    }
+
+    return candidates;
+  }
+
+  function manifestPathAliases(path) {
+    const rawPath = String(path).replace(/\\+/g, "/").replace(/^\/+/, "");
+    const aliases = new Set([rawPath]);
+    if (rawPath.toLowerCase().startsWith("www/")) {
+      aliases.add(rawPath.slice(4));
+    }
+    return { aliases, rawPath };
   }
 
   for (const file of config.files) {
-    const rawPath = String(file.path).replace(/\\+/g, "/").replace(/^\/+/, "");
-    const pathAliases = new Set([rawPath]);
-    if (rawPath.toLowerCase().startsWith("www/")) {
-      pathAliases.add(rawPath.slice(4));
+    const { aliases, rawPath } = manifestPathAliases(file.path);
+    for (const alias of aliases) {
+      addAssetReferenceVariants(alias, file.url, 0);
+      addFileRouteReference(alias, file.url, 0);
     }
 
-    for (const alias of pathAliases) {
-      addRawAssetReference(alias, file.url);
-      addRawAssetReference("./" + alias, file.url);
-    }
+    addRawAssetReference(config.fileRoutePrefix + rawPath, file.url, 0);
+  }
 
-    addRawAssetReference(config.fileRoutePrefix + rawPath, file.url);
+  for (const file of config.files) {
+    const { aliases } = manifestPathAliases(file.path);
+
+    for (const alias of aliases) {
+      for (const assetAlias of rpgMakerAssetReferenceAliases(alias)) {
+        const assetAliasUrl = encodedFileRouteUrl(assetAlias);
+        addAssetReferenceVariants(assetAlias, assetAliasUrl, 1);
+        addFileRouteReference(assetAlias, assetAliasUrl, 1);
+      }
+    }
   }
 
   function sanitizeMalformedPercentUrl(value) {
@@ -43,9 +188,83 @@ import { createPathRuntime } from "./desktop/path";
     const origin = window.location.origin;
     const isSameOriginAbsolute = value.startsWith(origin + "/");
     const reference = isSameOriginAbsolute ? value.slice(origin.length) : value;
-    const canonical = manifestUrlByRawReference.get(reference);
+    const canonical = manifestUrlByRawReference.get(reference)?.url;
     if (!canonical) return value;
     return isSameOriginAbsolute ? origin + canonical : canonical;
+  }
+
+  function exactManifestAssetEntry(value) {
+    if (typeof value !== "string") return null;
+    const origin = window.location.origin;
+    const reference = value.startsWith(origin + "/")
+      ? value.slice(origin.length)
+      : value;
+    const baseReference = reference.split("?")[0].split("#")[0];
+    return [reference, baseReference]
+      .map((candidate) => manifestUrlByRawReference.get(candidate))
+      .find((entry) => entry?.priority === 0) ?? null;
+  }
+
+  function shouldBypassEncryptedExtensionRewrite(value) {
+    if (typeof value !== "string") return false;
+    const path = value.split("?")[0].split("#")[0].toLowerCase();
+    if (
+      !path.endsWith(".png") &&
+      !path.endsWith(".ogg") &&
+      !path.endsWith(".m4a")
+    ) {
+      return false;
+    }
+    return exactManifestAssetEntry(value) !== null;
+  }
+
+  function bytesFromBuffer(value) {
+    if (value instanceof ArrayBuffer) return new Uint8Array(value);
+    if (ArrayBuffer.isView(value)) {
+      return new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
+    }
+    return null;
+  }
+
+  function imageMimeType(value) {
+    const bytes = bytesFromBuffer(value);
+    if (!bytes || bytes.length < 12) return null;
+    if (
+      bytes[0] === 0x89 &&
+      bytes[1] === 0x50 &&
+      bytes[2] === 0x4e &&
+      bytes[3] === 0x47 &&
+      bytes[4] === 0x0d &&
+      bytes[5] === 0x0a &&
+      bytes[6] === 0x1a &&
+      bytes[7] === 0x0a
+    ) {
+      return "image/png";
+    }
+    if (bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) {
+      return "image/jpeg";
+    }
+    if (
+      bytes[0] === 0x47 &&
+      bytes[1] === 0x49 &&
+      bytes[2] === 0x46 &&
+      bytes[3] === 0x38
+    ) {
+      return "image/gif";
+    }
+    if (
+      bytes[0] === 0x52 &&
+      bytes[1] === 0x49 &&
+      bytes[2] === 0x46 &&
+      bytes[3] === 0x46 &&
+      bytes[8] === 0x57 &&
+      bytes[9] === 0x45 &&
+      bytes[10] === 0x42 &&
+      bytes[11] === 0x50
+    ) {
+      return "image/webp";
+    }
+    return null;
   }
 
   function sanitizePlayerUrl(value) {
@@ -114,8 +333,171 @@ import { createPathRuntime } from "./desktop/path";
     if (typeof HTMLMediaElement !== "undefined") {
       patchSrcSetter(HTMLMediaElement.prototype);
     }
+    if (typeof Element !== "undefined") {
+      const setAttribute = Element.prototype.setAttribute;
+      Element.prototype.setAttribute = function(name, value) {
+        if (
+          typeof name === "string" &&
+          name.toLowerCase() === "src" &&
+          (
+            (
+              typeof HTMLImageElement !== "undefined" &&
+              this instanceof HTMLImageElement
+            ) ||
+            (
+              typeof HTMLMediaElement !== "undefined" &&
+              this instanceof HTMLMediaElement
+            ) ||
+            (
+              typeof HTMLSourceElement !== "undefined" &&
+              this instanceof HTMLSourceElement
+            )
+          )
+        ) {
+          return setAttribute.call(this, name, sanitizePlayerUrl(String(value)));
+        }
+        return setAttribute.apply(this, arguments);
+      };
+    }
   }
 
+  function installRpgMakerBrowserCompatibilityShim() {
+    const fallbackColor = "#ffffff";
+
+    if (!Object.prototype.hasOwnProperty.call(window, "追加")) {
+      try {
+        Object.defineProperty(window, "追加", {
+          configurable: true,
+          writable: true,
+          value: undefined,
+        });
+      } catch {
+        window.追加 = undefined;
+      }
+    }
+
+    function finiteInteger(value, fallback) {
+      const number = Number(value);
+      if (!Number.isFinite(number)) return fallback;
+      return Math.trunc(number);
+    }
+
+    function patchTextColor() {
+      const windowBase = window.Window_Base;
+      const prototype = windowBase && windowBase.prototype;
+      if (!prototype || typeof prototype.textColor !== "function") return;
+      if (prototype.textColor.__MzPlayerRpgMakerBrowserCompat) return;
+
+      const textColor = prototype.textColor;
+      const wrappedTextColor = function(n) {
+        return textColor.call(this, finiteInteger(n, 0));
+      };
+      Object.defineProperty(wrappedTextColor, "__MzPlayerRpgMakerBrowserCompat", {
+        value: true,
+      });
+      prototype.textColor = wrappedTextColor;
+    }
+
+    function patchBitmapGetPixel() {
+      const bitmap = window.Bitmap;
+      const prototype = bitmap && bitmap.prototype;
+      if (!prototype || typeof prototype.getPixel !== "function") return;
+      if (prototype.getPixel.__MzPlayerRpgMakerBrowserCompat) return;
+
+      const getPixel = prototype.getPixel;
+      const wrappedGetPixel = function(x, y) {
+        const numberX = Number(x);
+        const numberY = Number(y);
+        if (!Number.isFinite(numberX) || !Number.isFinite(numberY)) {
+          return fallbackColor;
+        }
+
+        try {
+          return getPixel.call(this, Math.trunc(numberX), Math.trunc(numberY));
+        } catch (error) {
+          if (
+            error instanceof TypeError &&
+            String(error.message || "").includes("long")
+          ) {
+            return fallbackColor;
+          }
+          throw error;
+        }
+      };
+      Object.defineProperty(wrappedGetPixel, "__MzPlayerRpgMakerBrowserCompat", {
+        value: true,
+      });
+      prototype.getPixel = wrappedGetPixel;
+    }
+
+    let attempts = 0;
+    const patch = () => {
+      attempts += 1;
+      patchTextColor();
+      patchBitmapGetPixel();
+      if (attempts > 600) window.clearInterval(timer);
+    };
+    const timer = window.setInterval(patch, 100);
+    patch();
+  }
+
+  function installRpgMakerEncryptedExtensionBypass() {
+    let attempts = 0;
+    const timer = window.setInterval(() => {
+      attempts += 1;
+      const decrypter = window.Decrypter;
+      if (decrypter && !decrypter.__MzPlayerEncryptedExtensionBypass) {
+        Object.defineProperty(decrypter, "__MzPlayerEncryptedExtensionBypass", {
+          value: true,
+        });
+        if (typeof decrypter.extToEncryptExt === "function") {
+          const extToEncryptExt = decrypter.extToEncryptExt;
+          decrypter.extToEncryptExt = function(url) {
+            if (shouldBypassEncryptedExtensionRewrite(url)) return url;
+            return extToEncryptExt.apply(this, arguments);
+          };
+        }
+        if (typeof decrypter.decryptArrayBuffer === "function") {
+          const decryptArrayBuffer = decrypter.decryptArrayBuffer;
+          decrypter.decryptArrayBuffer = function(arrayBuffer) {
+            const originalMimeType = imageMimeType(arrayBuffer);
+            try {
+              const result = decryptArrayBuffer.apply(this, arguments);
+              if (originalMimeType && !imageMimeType(result)) {
+                return arrayBuffer;
+              }
+              return result;
+            } catch (error) {
+              if (originalMimeType) return arrayBuffer;
+              throw error;
+            }
+          };
+        }
+        if (typeof decrypter.createBlobUrl === "function") {
+          const createBlobUrl = decrypter.createBlobUrl;
+          decrypter.createBlobUrl = function(arrayBuffer) {
+            const mimeType = imageMimeType(arrayBuffer);
+            if (
+              mimeType &&
+              typeof Blob !== "undefined" &&
+              window.URL &&
+              typeof window.URL.createObjectURL === "function"
+            ) {
+              return window.URL.createObjectURL(
+                new Blob([arrayBuffer], { type: mimeType }),
+              );
+            }
+            return createBlobUrl.apply(this, arguments);
+          };
+        }
+        window.clearInterval(timer);
+      }
+      if (attempts > 300) window.clearInterval(timer);
+    }, 100);
+  }
+
+  installRpgMakerBrowserCompatibilityShim();
+  installRpgMakerEncryptedExtensionBypass();
   installPlayerUrlPatch();
 
   function isMzPlayerRequireResolutionError(error) {

@@ -1232,6 +1232,11 @@
     68,
     82
   ]);
+  var JPEG_HEADER_BYTES = new Uint8Array([255, 216, 255]);
+  var GIF87A_HEADER_BYTES = new TextEncoder().encode("GIF87a");
+  var GIF89A_HEADER_BYTES = new TextEncoder().encode("GIF89a");
+  var WEBP_RIFF_HEADER_BYTES = new TextEncoder().encode("RIFF");
+  var WEBP_WEBP_HEADER_BYTES = new TextEncoder().encode("WEBP");
   function bytesToHex(bytes) {
     let output = "";
     for (const byte of bytes) output += byte.toString(16).padStart(2, "0");
@@ -1248,18 +1253,35 @@
     if (!bytes || bytes.byteLength < 32) return false;
     return bytesToHex(bytes.slice(0, 16)) === RPG_MAKER_HEADER_HEX;
   }
-  function isPngArrayBuffer(arrayBuffer) {
-    if (!arrayBuffer) return false;
-    return startsWithBytes(new Uint8Array(arrayBuffer), PNG_HEADER_BYTES);
+  function imageMimeTypeForArrayBuffer(arrayBuffer) {
+    if (!arrayBuffer) return void 0;
+    const bytes = new Uint8Array(arrayBuffer);
+    if (startsWithBytes(bytes, PNG_HEADER_BYTES)) return "image/png";
+    if (startsWithBytes(bytes, JPEG_HEADER_BYTES)) return "image/jpeg";
+    if (startsWithBytes(bytes, GIF87A_HEADER_BYTES) || startsWithBytes(bytes, GIF89A_HEADER_BYTES)) {
+      return "image/gif";
+    }
+    if (bytes.byteLength >= 12 && startsWithBytes(bytes, WEBP_RIFF_HEADER_BYTES) && startsWithBytes(bytes.slice(8, 12), WEBP_WEBP_HEADER_BYTES)) {
+      return "image/webp";
+    }
+    return void 0;
+  }
+  function createImageBlobUrl(arrayBuffer) {
+    const mimeType = imageMimeTypeForArrayBuffer(arrayBuffer);
+    if (mimeType && typeof Blob !== "undefined" && window.URL && typeof window.URL.createObjectURL === "function") {
+      return window.URL.createObjectURL(new Blob([arrayBuffer], { type: mimeType }));
+    }
+    return Decrypter.createBlobUrl(arrayBuffer);
   }
   function decryptImageArrayBufferWithFallback(arrayBuffer, defaultDecrypt) {
+    if (imageMimeTypeForArrayBuffer(arrayBuffer)) return arrayBuffer;
     let defaultResult;
     try {
       defaultResult = defaultDecrypt(arrayBuffer);
     } catch (error) {
       defaultResult = void 0;
     }
-    if (isPngArrayBuffer(defaultResult)) return defaultResult;
+    if (imageMimeTypeForArrayBuffer(defaultResult)) return defaultResult;
     const encryptedBytes = new Uint8Array(arrayBuffer || new ArrayBuffer(0));
     if (!hasRpgMakerHeader(encryptedBytes)) {
       if (defaultResult) return defaultResult;
@@ -1290,12 +1312,12 @@
             const arrayBuffer = decryptImageArrayBufferWithFallback(requestFile.response, (source) => {
               return Decrypter.decryptArrayBuffer(source);
             });
-            bitmap._image.src = Decrypter.createBlobUrl(arrayBuffer);
             bitmap._image.addEventListener("load", bitmap._loadListener = Bitmap.prototype._onLoad.bind(bitmap));
             bitmap._image.addEventListener(
               "error",
               bitmap._errorListener = bitmap._loader || Bitmap.prototype._onError.bind(bitmap)
             );
+            bitmap._image.src = createImageBlobUrl(arrayBuffer);
           }
         };
         requestFile.onerror = function() {

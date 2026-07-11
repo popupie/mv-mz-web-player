@@ -72,6 +72,8 @@ function installWindowShim(files: Record<string, string> = {}) {
     parent: { postMessage: vi.fn() },
     setTimeout,
     clearTimeout,
+    setInterval,
+    clearInterval,
   };
   windowShim.crypto = globalThis.crypto;
 
