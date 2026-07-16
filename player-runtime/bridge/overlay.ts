@@ -9,6 +9,7 @@ export function createTextOverlayBridge({ config, postParentMessage, settings })
   const overlayState = {
     nextOwnerId: 1,
     bitmapOwners: new WeakMap(),
+    contextOwners: new WeakMap(),
     entries: new Map(),
     lineGroups: new Map(),
     textLogTimers: new Map(),
@@ -22,6 +23,7 @@ export function createTextOverlayBridge({ config, postParentMessage, settings })
     sceneHooksInstalled: false,
     sceneBaseHooksInstalled: false,
     focusReturnInstalled: false,
+    canvasTextCaptureDepth: 0,
     root: null,
     style: null,
   };
@@ -355,12 +357,18 @@ export function createTextOverlayBridge({ config, postParentMessage, settings })
 
       overlayState.installedHooks = true;
       installSceneHooks();
+      installCanvasTextHooks();
 
       const bitmapDrawText = Bitmap.prototype.drawText;
       Bitmap.prototype.drawText = function (text, x, y, maxWidth, lineHeight, align) {
-        const result = bitmapDrawText.apply(this, arguments);
-        captureBitmapText(this, text, x, y, maxWidth, lineHeight, align);
-        return result;
+        overlayState.canvasTextCaptureDepth++;
+        try {
+          const result = bitmapDrawText.apply(this, arguments);
+          captureBitmapText(this, text, x, y, maxWidth, lineHeight, align);
+          return result;
+        } finally {
+          overlayState.canvasTextCaptureDepth--;
+        }
       };
 
       const bitmapClear = Bitmap.prototype.clear;
@@ -378,7 +386,7 @@ export function createTextOverlayBridge({ config, postParentMessage, settings })
       const createContents = Window_Base.prototype.createContents;
       Window_Base.prototype.createContents = function () {
         const result = createContents.apply(this, arguments);
-        if (this.contents) overlayState.bitmapOwners.set(this.contents, this);
+        if (this.contents) trackBitmapOwner(this.contents, this);
         return result;
       };
 
@@ -411,6 +419,42 @@ export function createTextOverlayBridge({ config, postParentMessage, settings })
 
     if (install()) return;
     setTimeout(installRpgMakerOverlayHooks, 250);
+  }
+
+  function installCanvasTextHooks() {
+    const canvasContext = window.CanvasRenderingContext2D;
+    const prototype = canvasContext && canvasContext.prototype;
+    if (!prototype || prototype.__mzPlayerTextOverlayCanvasHooks) return;
+
+    Object.defineProperty(prototype, "__mzPlayerTextOverlayCanvasHooks", {
+      value: true,
+      configurable: true,
+    });
+
+    const fillText = prototype.fillText;
+    if (typeof fillText === "function") {
+      prototype.fillText = function (text, x, y, maxWidth) {
+        const result = fillText.apply(this, arguments);
+        captureCanvasText(this, text, x, y, maxWidth);
+        return result;
+      };
+    }
+
+    const strokeText = prototype.strokeText;
+    if (typeof strokeText === "function") {
+      prototype.strokeText = function (text, x, y, maxWidth) {
+        const result = strokeText.apply(this, arguments);
+        captureCanvasText(this, text, x, y, maxWidth);
+        return result;
+      };
+    }
+  }
+
+  function trackBitmapOwner(bitmap, owner) {
+    if (!bitmap || !owner) return;
+    overlayState.bitmapOwners.set(bitmap, owner);
+    const context = bitmap._context;
+    if (context) overlayState.contextOwners.set(context, { bitmap, owner });
   }
 
   function installSceneHooks() {
@@ -568,6 +612,7 @@ export function createTextOverlayBridge({ config, postParentMessage, settings })
   function captureBitmapText(bitmap, rawText, x, y, maxWidth, lineHeight, align) {
     const owner = overlayState.bitmapOwners.get(bitmap);
     if (!owner || rawText === undefined || rawText === null) return;
+    trackBitmapOwner(bitmap, owner);
     const text = String(rawText);
     if (!text) return;
     if (!Number.isFinite(x) || !Number.isFinite(y)) return;
@@ -608,6 +653,52 @@ export function createTextOverlayBridge({ config, postParentMessage, settings })
       fontSize: bitmap.fontSize || owner.standardFontSize?.() || 24,
       fontFace: bitmap.fontFace || owner.standardFontFace?.() || "sans-serif",
       textAlign: alignmentBox.textAlign,
+      updatedAt: performance.now(),
+    });
+  }
+
+  function captureCanvasText(context, rawText, x, y, maxWidth) {
+    if (overlayState.canvasTextCaptureDepth > 0) return;
+    const binding = overlayState.contextOwners.get(context);
+    if (!binding?.owner || rawText === undefined || rawText === null) return;
+
+    const text = String(rawText);
+    if (!text) return;
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+
+    const bitmap = binding.bitmap;
+    const owner = binding.owner;
+    const fontSize = canvasFontSize(context, bitmap, owner);
+    const height = Math.max(1, owner.lineHeight?.() || Math.ceil(fontSize * 1.25));
+    const measuredWidth = safeMeasureCanvas(context, bitmap, text);
+    const width = Math.max(1, Math.min(measuredWidth, Number(maxWidth) || measuredWidth));
+    const left = canvasTextLeft(x, width, context.textAlign);
+    const top = canvasTextTop(y, fontSize, height, context.textBaseline);
+
+    if (top < -height || top >= bitmap.height || left > bitmap.width || left + width < 0) return;
+    if (owner._checkWordWrapMode) return;
+
+    const key = [
+      ownerId(owner),
+      "canvas",
+      Math.round(left),
+      Math.round(top),
+      Math.round(width),
+      Math.round(height),
+      hashText(text),
+    ].join(":");
+
+    upsertEntry(key, {
+      owner,
+      bitmap,
+      text,
+      x: left,
+      y: top,
+      width,
+      height,
+      fontSize,
+      fontFace: canvasFontFace(context) || bitmap.fontFace || owner.standardFontFace?.() || "sans-serif",
+      textAlign: "left",
       updatedAt: performance.now(),
     });
   }
@@ -662,6 +753,40 @@ export function createTextOverlayBridge({ config, postParentMessage, settings })
     } catch {
       return Math.max(1, text.length * (bitmap.fontSize || 24) * 0.6);
     }
+  }
+
+  function safeMeasureCanvas(context, bitmap, text) {
+    try {
+      return Math.max(1, context.measureText(text).width);
+    } catch {
+      return Math.max(1, text.length * (canvasFontSize(context, bitmap, null) || 24) * 0.6);
+    }
+  }
+
+  function canvasFontSize(context, bitmap, owner) {
+    const match = String(context.font || "").match(/(\d+(?:\.\d+)?)px/);
+    const parsed = match ? Number(match[1]) : 0;
+    return parsed || bitmap?.fontSize || owner?.standardFontSize?.() || 24;
+  }
+
+  function canvasFontFace(context) {
+    const font = String(context.font || "").trim();
+    if (!font) return "";
+    const match = font.match(/\d+(?:\.\d+)?px\s+(.+)$/);
+    return match ? match[1] : "";
+  }
+
+  function canvasTextLeft(x, width, align) {
+    if (align === "center") return x - width / 2;
+    if (align === "right" || align === "end") return x - width;
+    return x;
+  }
+
+  function canvasTextTop(y, fontSize, height, baseline) {
+    if (baseline === "top" || baseline === "hanging") return y;
+    if (baseline === "middle") return y - height / 2;
+    if (baseline === "bottom" || baseline === "ideographic") return y - height;
+    return y - fontSize;
   }
 
   function adjustedTextLeft(x, maxWidth, measuredWidth, align) {
