@@ -2,29 +2,47 @@
 
 import { positiveFiniteNumber } from "./keyEvents";
 
+export function detectNativeGameSize({ graphics, tyranoConfig, canvas }) {
+  function size(width, height) {
+    const normalizedWidth = positiveFiniteNumber(width);
+    const normalizedHeight = positiveFiniteNumber(height);
+    return normalizedWidth && normalizedHeight
+      ? { width: normalizedWidth, height: normalizedHeight }
+      : null;
+  }
+
+  return (
+    size(graphics?.width || graphics?._width || graphics?.boxWidth, graphics?.height || graphics?._height || graphics?.boxHeight) ||
+    size(tyranoConfig?.scWidth, tyranoConfig?.scHeight) ||
+    size(canvas?.width, canvas?.height)
+  );
+}
+
 export function createViewportBridge({ postParentMessage, scheduleFlush }) {
   let latestPlayerViewport = null;
   let lastAppliedViewport = "";
   let viewportFitFrame = 0;
 
+  function nativeGameSize() {
+    return detectNativeGameSize({
+      graphics: window.Graphics,
+      tyranoConfig: window.TYRANO?.kag?.config || window.config,
+      canvas: document.querySelector("canvas"),
+    });
+  }
+
   function installViewportBridge() {
     const notify = () => {
-      const graphics = window.Graphics || {};
-      const canvas = graphics._canvas || document.querySelector("canvas");
-      const width = Number(graphics.width || canvas?.width || 816);
-      const height = Number(graphics.height || canvas?.height || 624);
-      if (width > 0 && height > 0) {
-        postParentMessage({ type: "game-viewport", width, height });
-      }
+      const detected = nativeGameSize();
+      if (!detected) return false;
+      postParentMessage({ type: "game-viewport", ...detected });
+      return true;
     };
 
     notify();
     window.addEventListener("resize", notify);
     const timer = window.setInterval(() => {
-      notify();
-      if (window.Graphics && (window.Graphics.width || window.Graphics._canvas)) {
-        window.clearInterval(timer);
-      }
+      if (notify()) window.clearInterval(timer);
     }, 250);
     window.addEventListener("resize", scheduleViewportFit);
     scheduleViewportFit();
@@ -74,7 +92,7 @@ export function createViewportBridge({ postParentMessage, scheduleFlush }) {
       }
     } catch (error) {
       lastAppliedViewport = "";
-      console.warn("[MZ Browser Player viewport] Could not notify RPG Maker resize.", error);
+      console.warn("[Local Web Game Player viewport] Could not notify RPG Maker resize.", error);
     }
   }
 
@@ -181,7 +199,7 @@ export function createViewportBridge({ postParentMessage, scheduleFlush }) {
       try {
         applyViewportFit();
       } catch (error) {
-        console.warn("[MZ Browser Player viewport] Could not fit player viewport.", error);
+        console.warn("[Local Web Game Player viewport] Could not fit player viewport.", error);
       }
     });
   }

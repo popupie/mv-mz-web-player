@@ -6,6 +6,8 @@ const mimeByExtension = new Map<string, string>([
   ["json", "application/json; charset=utf-8"],
   ["css", "text/css; charset=utf-8"],
   ["txt", "text/plain; charset=utf-8"],
+  ["tjs", "text/plain; charset=utf-8"],
+  ["ks", "text/plain; charset=utf-8"],
   ["png", "image/png"],
   ["png_", "image/png"],
   ["png__", "image/png"],

@@ -220,7 +220,7 @@ export function createNwRuntime() {
         if (typeof callback === "function") callback(openedWindow);
         openedWindow.__emit("loaded");
       });
-      console.info("[MZ Player nw.Window.open]", {
+      console.info("[Local Web Game Player nw.Window.open]", {
         url: String(url ?? ""),
         options: options && typeof options === "object" ? options : {},
         mode: "current-frame",

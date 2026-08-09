@@ -5,7 +5,7 @@ const FILE_STORE = "files";
 const BLOB_STORE = "blobs";
 const HANDLE_STORE = "handles";
 const PLAYER_DESKTOP_RUNTIME_VERSION = "desktop-api-1";
-const PLAYER_BRIDGE_RUNTIME_VERSION = "bridge-api-1";
+const PLAYER_BRIDGE_RUNTIME_VERSION = "bridge-api-2";
 const SESSION_FILE_TIMEOUT_MS = 10000;
 const EMPTY_SOURCE_MAP_TEXT = "{\"version\":3,\"sources\":[],\"mappings\":\"\"}";
 const RPG_MAKER_ENCRYPTED_HEADER_BYTES = Uint8Array.from([
@@ -796,6 +796,32 @@ function isExactAssetRequestMatch(match) {
   return normalizePath(match.requestedPath) === normalizePath(match.matchedPath);
 }
 
+function isTyranoConfigPath(path) {
+  const normalized = normalizePath(path).toLowerCase();
+  return normalized === "data/system/config.tjs" || normalized.endsWith("/data/system/config.tjs");
+}
+
+function isTyranoGame(files) {
+  let hasRuntime = false;
+  let hasConfig = false;
+
+  for (const file of files) {
+    const path = normalizePath(file.path).toLowerCase();
+    hasRuntime ||= path === "tyrano/tyrano.js" || path.endsWith("/tyrano/tyrano.js");
+    hasConfig ||= isTyranoConfigPath(path);
+    if (hasRuntime && hasConfig) return true;
+  }
+
+  return false;
+}
+
+function adaptTyranoConfig(text) {
+  return text.replace(
+    /^(\s*;\s*configSave\s*=\s*)file(\s*(?:\/\/.*)?)$/gim,
+    "$1webstorage$2",
+  );
+}
+
 async function transformAssetBlobForRequest(gameId, match, blob, requestClientId) {
   if (isExactAssetRequestMatch(match)) {
     return { blob };
@@ -918,6 +944,15 @@ async function serveGameFile(url, request) {
   if (request.method === "HEAD")
     return new Response(null, { status: 200, headers });
 
+  if (isTyranoConfigPath(record.path)) {
+    const files = await getGameFiles(gameId);
+    if (isTyranoGame(files)) {
+      const config = adaptTyranoConfig(await responseBlob.text());
+      headers.set("Content-Type", "text/plain; charset=utf-8");
+      return new Response(config, { status: 200, headers });
+    }
+  }
+
   if ((record.mime || "").startsWith("text/html")) {
     const html = await responseBlob.text();
     const files = await getGameFiles(gameId);
@@ -966,15 +1001,19 @@ function injectBridge(html, game, files) {
     gameId: game.id,
     settings: game.settings,
   })};</script>`;
-  const desktopConfig = `<script>window.__MZ_PLAYER_DESKTOP_CONFIG=${jsonForScript(
-    desktopRuntimeConfig(game, files),
-  )};</script>`;
-  const runtimeScripts = [
+  const isTyrano = isTyranoGame(files);
+  const desktopScripts = isTyrano ? "" : [
+    `<script>window.__MZ_PLAYER_DESKTOP_CONFIG=${jsonForScript(
+      desktopRuntimeConfig(game, files),
+    )};</script>`,
     `<script src="/mz-player-runtime/buffer.js?v=${PLAYER_DESKTOP_RUNTIME_VERSION}"></script>`,
     `<script src="/mz-player-runtime/desktop.js?v=${PLAYER_DESKTOP_RUNTIME_VERSION}"></script>`,
+  ].join("");
+  const runtimeScripts = [
+    desktopScripts,
     `<script src="/runtime-bridge.js?v=${PLAYER_BRIDGE_RUNTIME_VERSION}"></script>`,
   ].join("");
-  const config = `${bridgeConfig}${desktopConfig}${runtimeScripts}`;
+  const config = `${bridgeConfig}${runtimeScripts}`;
 
   if (/<head[^>]*>/i.test(html)) {
     return html.replace(/<head([^>]*)>/i, `<head$1>${config}`);

@@ -8,7 +8,7 @@ import { createPathRuntime } from "./desktop/path";
 (() => {
   const config = window.__MZ_PLAYER_DESKTOP_CONFIG;
   if (!config || typeof config !== "object") {
-    throw new Error("MZ browser desktop runtime config did not load.");
+    throw new Error("Local Web Game Player desktop runtime config did not load.");
   }
   const manifestUrlByRawReference = new Map();
 
@@ -505,10 +505,10 @@ import { createPathRuntime } from "./desktop/path";
       error instanceof Error &&
       (
         error.message.startsWith(
-          "MZ browser player cannot provide Node module:",
+          "Local Web Game Player cannot provide Node module:",
         ) ||
         error.message.startsWith(
-          "MZ browser player cannot resolve packaged module",
+          "Local Web Game Player cannot resolve packaged module",
         )
       )
     );
@@ -595,11 +595,11 @@ import { createPathRuntime } from "./desktop/path";
   const bufferModule = window.__MzPlayerBufferModule;
   const BrowserBuffer = bufferModule?.Buffer;
   if (!bufferModule || typeof BrowserBuffer?.from !== "function") {
-    throw new Error("MZ Player browser Buffer runtime did not load.");
+    throw new Error("Local Web Game Player Buffer runtime did not load.");
   }
   const browserCryptoModule = window.__MzPlayerCryptoModule;
   if (!browserCryptoModule || typeof browserCryptoModule !== "object") {
-    throw new Error("MZ Player browser crypto runtime did not load.");
+    throw new Error("Local Web Game Player crypto runtime did not load.");
   }
   if (typeof window.Buffer !== "function") {
     Object.defineProperty(window, "Buffer", {
@@ -672,7 +672,7 @@ import { createPathRuntime } from "./desktop/path";
       resolvedFile ?? resolvePackagedModule(name, parentFilename);
     if (!manifestFile) {
       throw new Error(
-        "MZ browser player cannot resolve packaged module '" +
+        "Local Web Game Player cannot resolve packaged module '" +
           name +
           "' from '" +
           parentFilename +
@@ -707,7 +707,7 @@ import { createPathRuntime } from "./desktop/path";
           const file = resolvePackagedModule(request, filename);
           if (!file) {
             throw new Error(
-              "MZ browser player cannot resolve packaged module '" +
+              "Local Web Game Player cannot resolve packaged module '" +
                 request +
                 "' from '" +
                 filename +
@@ -751,7 +751,7 @@ import { createPathRuntime } from "./desktop/path";
     if (manifestFile) {
       return loadPackagedModule(key, parentFilename, manifestFile);
     }
-    throw new Error("MZ browser player cannot provide Node module: " + key);
+    throw new Error("Local Web Game Player cannot provide Node module: " + key);
   }
 
   const requireBridge = installGlobalRequireBridge(mzPlayerRequire);
@@ -807,7 +807,7 @@ import { createPathRuntime } from "./desktop/path";
           }
         }
         console.warn(
-          "[MZ Player RPG Maker rescue] _Data_Manager_loadGame was called before DataManager.loadGameWithoutRescue existed.",
+          "[Local Web Game Player RPG Maker rescue] _Data_Manager_loadGame was called before DataManager.loadGameWithoutRescue existed.",
         );
         return false;
       },
@@ -816,7 +816,7 @@ import { createPathRuntime } from "./desktop/path";
 
   installRpgMakerLoadGameAliasRescue();
 
-  console.info("[MZ browser desktop API]", {
+  console.info("[Local Web Game Player desktop API]", {
     entryId: config.entryId,
     modules: Object.keys(modules),
   });

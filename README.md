@@ -1,8 +1,9 @@
-# MV/MZ Web Player
+# Local Web Game Player
 
-MV/MZ Web Player is a browser player for local RPG Maker MV and MZ web exports.
-You can open a local game folder or import a ZIP, then play without uploading
-game files to a server.
+Local Web Game Player runs compatible local HTML game exports directly in your
+browser. It supports RPG Maker MV/MZ and TyranoScript games. You can open a
+local game folder or import a ZIP, then play without uploading game files to a
+server.
 
 ## Demo
 
@@ -10,8 +11,8 @@ https://github.com/user-attachments/assets/56beacfb-855d-4bdf-87a2-8c388e0cc9b1
 
 ## Use Case
 
-Many RPG Maker games are made for Windows. This app is useful when playing RPG
-Maker MV and MZ web exports on Linux or macOS through a browser.
+Many RPG Maker and TyranoScript games are distributed as desktop applications.
+This app is useful when playing web exports on Linux or macOS through a browser.
 
 It can also help with language study. The text overlay makes game text easier to
 select with browser tools such as the Yomitan extension. Yomitan is a separate
@@ -36,8 +37,9 @@ project and is not included with this app.
 
 ## Web Export Examples
 
-A web export is the browser version of an RPG Maker MV or MZ game. It usually
-has an `index.html` file and folders such as `js`, `img`, `audio`, and `data`.
+A compatible web export has an `index.html` entry point and all of the assets
+needed by the game. RPG Maker MV/MZ exports usually contain folders such as
+`js`, `img`, `audio`, and `data`.
 
 Some games keep these files inside a `www` folder:
 
@@ -62,6 +64,47 @@ GameFolder/
   audio/
   data/
 ```
+
+TyranoScript exports commonly use this layout:
+
+```text
+GameFolder/
+  index.html
+  tyrano/
+  data/
+```
+
+Desktop wrapper files such as Electron's `main.js`, `package.json`, and
+`node_modules` are not needed for browser playback. The player automatically
+uses browser storage for TyranoScript exports that were configured for desktop
+file saves.
+
+### Electron games packaged as `app.asar`
+
+Electron can bundle an application's source files into `app.asar`. The official
+[Electron packaging guide](https://www.electronjs.org/docs/latest/tutorial/application-distribution/)
+shows it inside `Game.app/Contents/Resources` on macOS and inside the game's
+`resources` folder on Windows. Packaged Linux applications commonly use the
+same `resources` folder layout.
+
+Extract the archive into a new folder without modifying the installed game:
+
+```sh
+pnpm dlx @electron/asar extract "/path/to/resources/app.asar" "./electron_extract"
+```
+
+The current [official `@electron/asar` CLI](https://github.com/electron/asar)
+requires Node.js 22.12 or newer.
+
+If `app.asar.unpacked` exists, copy its contents into the extracted folder while
+preserving its subdirectories. Then find the folder containing a compatible web
+entry point. For TyranoScript, look for `index.html`, `tyrano`, and `data`. For
+RPG Maker MV or MZ, look for `index.html`, `js`, and `data`, sometimes inside a
+`www` folder. Open that folder in Local Web Game Player.
+
+Extraction does not guarantee browser compatibility. Games that depend on
+unsupported Electron or Node APIs may still fail. Encrypted or DRM-protected
+packages are also not supported.
 
 ## Local Setup
 
@@ -112,6 +155,6 @@ older folder picker.
 
 ## Notes
 
-This is an unofficial player for user-provided RPG Maker MV and MZ web exports.
-It is not affiliated with or endorsed by Gotcha Gotcha Games, KADOKAWA, or
-Degica.
+This is an unofficial player for user-provided web game exports. It is not
+affiliated with or endorsed by Gotcha Gotcha Games, KADOKAWA, Degica, or the
+TyranoScript project.

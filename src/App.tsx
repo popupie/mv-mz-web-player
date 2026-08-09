@@ -10,7 +10,7 @@ import { defaultDictionaryDismissGuard, dictionaryGuardFor, overlayTogglePatch, 
 import type { DictionaryDismissGuard, GameRecord, PlayerToParentMessage } from "./lib/types";
 
 const textLogLimit = 100;
-const serviceTitle = "MV/MZ Web Player";
+const serviceTitle = "Local Web Game Player";
 const unsavedProgressWarning = "Leave the current game? Unsaved progress in the game may be lost.";
 
 export default function App() {

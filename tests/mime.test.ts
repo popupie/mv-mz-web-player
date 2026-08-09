@@ -6,6 +6,8 @@ describe("detectMime", () => {
     expect(detectMime("index.html")).toContain("text/html");
     expect(detectMime("js/rpg_core.js")).toContain("text/javascript");
     expect(detectMime("data/System.json")).toContain("application/json");
+    expect(detectMime("data/system/Config.tjs")).toContain("text/plain");
+    expect(detectMime("data/scenario/first.ks")).toContain("text/plain");
     expect(detectMime("img/pictures/title.rpgmvp")).toBe("image/png");
     expect(detectMime("img/pictures/title.png_")).toBe("image/png");
     expect(detectMime("audio/bgm/theme.rpgmvo")).toBe("audio/ogg");

@@ -48,8 +48,15 @@ export function PlayerPanel({
           <section className="home-guide-intro" aria-labelledby="home-title">
             <h2 id="home-title">How to use this player</h2>
             <p>
-              Pick a game export from the sidebar, then select it from the
-              library. The folder or ZIP needs a game <code>index.html</code>.
+              Open a local RPG Maker MV/MZ or TyranoScript export, then select
+              it from the library. The folder or ZIP needs a game{" "}
+              <code>index.html</code>.
+            </p>
+            <p>
+              If a TyranoScript Electron game only has{" "}
+              <code>resources/app.asar</code>, extract it first, then open the
+              extracted folder containing <code>index.html</code>,{" "}
+              <code>tyrano</code>, and <code>data</code>.
             </p>
           </section>
 
@@ -93,7 +100,7 @@ export function PlayerPanel({
                 </div>
                 <div className="home-control-cell">
                   <Icon name="layers" />
-                  <span>Overlay hooks game text for the on-screen overlay and text log.</span>
+                  <span>Overlay captures RPG Maker canvas text and TyranoScript HTML dialogue for selection and the text log.</span>
                 </div>
 
                 <div className="home-control-cell">

@@ -146,3 +146,52 @@ describe("service worker RPG Maker asset helpers", () => {
     expect(new Uint8Array(await result.blob.arrayBuffer())).toEqual(bytes);
   });
 });
+
+describe("service worker Tyrano compatibility helpers", () => {
+  it("detects Tyrano exports from their runtime and config files", () => {
+    const helpers = loadServiceWorkerHelpers();
+    const tyranoFiles = [
+      { path: "index.html" },
+      { path: "tyrano/tyrano.js" },
+      { path: "data/system/Config.tjs" },
+    ];
+
+    expect(helpers.isTyranoGame(tyranoFiles)).toBe(true);
+    expect(helpers.isTyranoGame([{ path: "index.html" }, { path: "js/rmmz_core.js" }])).toBe(false);
+  });
+
+  it("uses browser storage for desktop Tyrano exports", () => {
+    const helpers = loadServiceWorkerHelpers();
+    const source = ";debugMenu.visible=false\n;configSave=file\n;projectID=test";
+
+    expect(helpers.adaptTyranoConfig(source)).toContain(";configSave=webstorage");
+  });
+
+  it("omits Node desktop shims from Tyrano HTML while retaining the player bridge", () => {
+    const helpers = loadServiceWorkerHelpers();
+    const game = { id: "tyrano-1", settings: {} };
+    const files = [
+      { path: "index.html", size: 1, mime: "text/html" },
+      { path: "tyrano/tyrano.js", size: 1, mime: "text/javascript" },
+      { path: "data/system/Config.tjs", size: 1, mime: "text/plain" },
+    ];
+    const html = helpers.injectBridge("<html><head></head><body></body></html>", game, files);
+
+    expect(html).toContain("/runtime-bridge.js");
+    expect(html).not.toContain("/mz-player-runtime/desktop.js");
+    expect(html).not.toContain("__MZ_PLAYER_DESKTOP_CONFIG");
+  });
+
+  it("keeps Node desktop shims for RPG Maker HTML", () => {
+    const helpers = loadServiceWorkerHelpers();
+    const game = { id: "rpg-1", settings: {} };
+    const files = [
+      { path: "index.html", size: 1, mime: "text/html" },
+      { path: "js/rmmz_core.js", size: 1, mime: "text/javascript" },
+    ];
+    const html = helpers.injectBridge("<html><head></head><body></body></html>", game, files);
+
+    expect(html).toContain("/mz-player-runtime/desktop.js");
+    expect(html).toContain("__MZ_PLAYER_DESKTOP_CONFIG");
+  });
+});

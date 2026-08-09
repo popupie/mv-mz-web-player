@@ -229,6 +229,7 @@
       lineGroups: /* @__PURE__ */ new Map(),
       textLogTimers: /* @__PURE__ */ new Map(),
       textLogValues: /* @__PURE__ */ new Map(),
+      domSourceIds: /* @__PURE__ */ new WeakMap(),
       consumedGuardKeyCodes: /* @__PURE__ */ new Set(),
       hoveredTextEntry: null,
       raf: 0,
@@ -238,6 +239,10 @@
       sceneHooksInstalled: false,
       sceneBaseHooksInstalled: false,
       focusReturnInstalled: false,
+      tyranoHooksInstalled: false,
+      tyranoObserver: null,
+      tyranoScanFrame: 0,
+      nextDomSourceId: 1,
       canvasTextCaptureDepth: 0,
       root: null,
       style: null
@@ -289,6 +294,11 @@
           font-kerning: none;
           font-variant-ligatures: none;
           opacity: 1;
+        }
+
+        .mz-player-text-overlay-entry-dom {
+          white-space: pre-wrap;
+          overflow-wrap: normal;
         }
 
         #mz-player-text-overlay.mz-player-text-overlay-readable .mz-player-text-overlay-entry {
@@ -517,6 +527,7 @@
         clearOverlayEntries();
         clearGuardState();
       }
+      scheduleTyranoScan();
       scheduleFlush();
     }
     function overlayIsActive() {
@@ -582,6 +593,159 @@
       };
       if (install()) return;
       setTimeout(installRpgMakerOverlayHooks, 250);
+    }
+    function installTyranoOverlayHooks() {
+      if (overlayState.tyranoHooksInstalled) return;
+      const install = () => {
+        if (overlayState.tyranoHooksInstalled) return true;
+        const roots = tyranoRoots();
+        if (!roots.length) return false;
+        overlayState.tyranoHooksInstalled = true;
+        overlayState.tyranoObserver = new MutationObserver(scheduleTyranoScan);
+        for (const root of roots) {
+          overlayState.tyranoObserver.observe(root, {
+            subtree: true,
+            childList: true,
+            characterData: true,
+            attributes: true,
+            attributeFilter: ["class", "hidden", "style"]
+          });
+        }
+        if (document.fonts) {
+          document.fonts.ready.then(scheduleTyranoScan);
+          document.fonts.addEventListener?.("loadingdone", scheduleTyranoScan);
+        }
+        window.addEventListener("resize", scheduleTyranoScan);
+        scheduleTyranoScan();
+        return true;
+      };
+      if (install()) return;
+      setTimeout(installTyranoOverlayHooks, 250);
+    }
+    function scheduleTyranoScan() {
+      if (!overlayState.tyranoHooksInstalled || overlayState.tyranoScanFrame) return;
+      overlayState.tyranoScanFrame = requestAnimationFrame(() => {
+        overlayState.tyranoScanFrame = 0;
+        scanTyranoText();
+      });
+    }
+    function scanTyranoText() {
+      if (!overlayIsActive()) return;
+      const roots = tyranoRoots();
+      if (!roots.length) return;
+      const sources = /* @__PURE__ */ new Set();
+      for (const root of roots) {
+        for (const message of root.querySelectorAll(".message_inner")) {
+          const paragraphs = message.querySelectorAll(":scope > p");
+          if (!paragraphs.length) {
+            sources.add(message);
+            continue;
+          }
+          for (const paragraph of paragraphs) {
+            const styledSpans = paragraph.querySelectorAll(":scope > span");
+            if (styledSpans.length) {
+              for (const span of styledSpans) sources.add(span);
+            } else {
+              sources.add(paragraph);
+            }
+          }
+        }
+        for (const source of root.querySelectorAll(".chara_name_area, [data-event-tag='glink'], .vchat-text-inner")) {
+          sources.add(source);
+        }
+      }
+      const activeKeys = /* @__PURE__ */ new Set();
+      for (const source of sources) {
+        const text = tyranoSourceText(source);
+        if (!text || !domSourceIsVisible(source)) continue;
+        const key = `tyrano:${domSourceId(source)}`;
+        const style = getComputedStyle(source);
+        const scale = domVisualScale(source);
+        activeKeys.add(key);
+        upsertEntry(key, {
+          domSource: source,
+          text,
+          fontSize: parseCssNumber(style.fontSize) || 24,
+          fontFace: style.fontFamily || "sans-serif",
+          fontStyle: style.fontStyle,
+          fontWeight: style.fontWeight,
+          fontStretch: style.fontStretch,
+          fontVariant: style.fontVariant,
+          fontKerning: style.fontKerning,
+          fontOpticalSizing: style.fontOpticalSizing,
+          fontFeatureSettings: style.fontFeatureSettings,
+          fontVariationSettings: style.fontVariationSettings,
+          fontSynthesis: style.fontSynthesis,
+          lineHeight: parseCssNumber(style.lineHeight),
+          textAlign: style.textAlign || "left",
+          direction: style.direction,
+          letterSpacing: style.letterSpacing,
+          wordSpacing: style.wordSpacing,
+          wordBreak: style.wordBreak,
+          writingMode: style.writingMode,
+          textOrientation: style.textOrientation,
+          textRendering: style.textRendering,
+          textTransform: style.textTransform,
+          paddingTop: style.paddingTop,
+          paddingRight: style.paddingRight,
+          paddingBottom: style.paddingBottom,
+          paddingLeft: style.paddingLeft,
+          visualScaleX: scale.x,
+          visualScaleY: scale.y,
+          updatedAt: performance.now()
+        });
+      }
+      for (const [key, entry] of overlayState.entries) {
+        if (entry.domSource && !activeKeys.has(key)) removeEntry(key, entry);
+      }
+      scheduleFlush();
+    }
+    function tyranoRoots() {
+      return Array.from(document.querySelectorAll("#tyrano_base, #vchat_base"));
+    }
+    function domSourceId(source) {
+      let id = overlayState.domSourceIds.get(source);
+      if (!id) {
+        id = overlayState.nextDomSourceId++;
+        overlayState.domSourceIds.set(source, id);
+      }
+      return id;
+    }
+    function tyranoSourceText(source) {
+      const text = typeof source.innerText === "string" ? source.innerText : source.textContent;
+      return String(text || "").replace(/\u00a0/g, " ").trim();
+    }
+    function parseCssNumber(value) {
+      const parsed = Number.parseFloat(String(value || ""));
+      return Number.isFinite(parsed) ? parsed : 0;
+    }
+    function domVisualScale(source) {
+      const root = source.closest("#tyrano_base, #vchat_base");
+      if (!root) return { x: 1, y: 1 };
+      const rect = root.getBoundingClientRect();
+      const style = getComputedStyle(root);
+      const layoutWidth = parseCssNumber(style.width) || root.offsetWidth;
+      const layoutHeight = parseCssNumber(style.height) || root.offsetHeight;
+      return {
+        x: positiveScale(rect.width, layoutWidth),
+        y: positiveScale(rect.height, layoutHeight)
+      };
+    }
+    function positiveScale(rendered, layout) {
+      const scale = Number(rendered) / Number(layout);
+      return Number.isFinite(scale) && scale > 0 ? scale : 1;
+    }
+    function scaledCssLength(value, scale) {
+      const text = String(value || "");
+      const match = text.match(/^(-?\d+(?:\.\d+)?)px$/);
+      return match ? `${Number(match[1]) * scale}px` : text || "normal";
+    }
+    function domSourceIsVisible(source) {
+      if (!source?.isConnected) return false;
+      const style = getComputedStyle(source);
+      if (style.display === "none" || style.visibility === "hidden" || Number(style.opacity) === 0) return false;
+      const rect = source.getBoundingClientRect();
+      return rect.width > 0 && rect.height > 0;
     }
     function installCanvasTextHooks() {
       const canvasContext = window.CanvasRenderingContext2D;
@@ -952,6 +1116,7 @@
       overlayState.textLogTimers.set(key, timer);
     }
     function entryIsLoggable(entry) {
+      if (entry?.domSource) return true;
       const name = entry?.owner?.constructor?.name || "";
       return /^(Window_Message|Window_ChoiceList|Window_NameBox|Window_ScrollText)$/.test(name);
     }
@@ -976,29 +1141,62 @@
           continue;
         }
         if (!entry.element) {
-          entry.element = document.createElement("span");
-          entry.element.className = "mz-player-text-overlay-entry";
+          entry.element = document.createElement(entry.domSource ? "div" : "span");
+          entry.element.className = entry.domSource ? "mz-player-text-overlay-entry mz-player-text-overlay-entry-dom" : "mz-player-text-overlay-entry";
           overlayState.root.appendChild(entry.element);
         }
         if (entry.element.textContent !== entry.text) {
           entry.element.textContent = entry.text;
           entry.element.setAttribute("aria-label", entry.text);
           entry.element.dataset.rpgText = entry.text;
+          entry.element.dataset.gameText = entry.text;
           entry.element.removeAttribute("title");
         }
         setStyleIfChanged(entry.element, "left", `${rect.left}px`);
         setStyleIfChanged(entry.element, "top", `${rect.top}px`);
         setStyleIfChanged(entry.element, "width", `${Math.max(1, rect.width)}px`);
         setStyleIfChanged(entry.element, "height", `${Math.max(1, rect.height)}px`);
-        setStyleIfChanged(entry.element, "font", `${Math.max(1, rect.fontSize)}px ${entry.fontFace || "sans-serif"}`);
-        setStyleIfChanged(entry.element, "lineHeight", `${Math.max(1, rect.height)}px`);
         setStyleIfChanged(entry.element, "textAlign", entry.textAlign || "left");
+        if (entry.domSource) {
+          const scaleX = entry.visualScaleX || 1;
+          const scaleY = entry.visualScaleY || 1;
+          const fontSize = Math.max(1, (entry.fontSize || rect.fontSize) * scaleY);
+          const lineHeight = Math.max(1, (entry.lineHeight || entry.fontSize * 1.2 || rect.fontSize * 1.2) * scaleY);
+          setStyleIfChanged(entry.element, "fontFamily", entry.fontFace || "sans-serif");
+          setStyleIfChanged(entry.element, "fontSize", `${fontSize}px`);
+          setStyleIfChanged(entry.element, "fontStyle", entry.fontStyle || "normal");
+          setStyleIfChanged(entry.element, "fontWeight", entry.fontWeight || "normal");
+          setStyleIfChanged(entry.element, "fontStretch", entry.fontStretch || "normal");
+          setStyleIfChanged(entry.element, "fontVariant", entry.fontVariant || "normal");
+          setStyleIfChanged(entry.element, "fontKerning", entry.fontKerning || "auto");
+          setStyleIfChanged(entry.element, "fontOpticalSizing", entry.fontOpticalSizing || "auto");
+          setStyleIfChanged(entry.element, "fontFeatureSettings", entry.fontFeatureSettings || "normal");
+          setStyleIfChanged(entry.element, "fontVariationSettings", entry.fontVariationSettings || "normal");
+          setStyleIfChanged(entry.element, "fontSynthesis", entry.fontSynthesis || "weight style small-caps");
+          setStyleIfChanged(entry.element, "lineHeight", `${lineHeight}px`);
+          setStyleIfChanged(entry.element, "direction", entry.direction || "ltr");
+          setStyleIfChanged(entry.element, "letterSpacing", scaledCssLength(entry.letterSpacing, scaleX));
+          setStyleIfChanged(entry.element, "wordSpacing", scaledCssLength(entry.wordSpacing, scaleX));
+          setStyleIfChanged(entry.element, "wordBreak", entry.wordBreak || "normal");
+          setStyleIfChanged(entry.element, "writingMode", entry.writingMode || "horizontal-tb");
+          setStyleIfChanged(entry.element, "textOrientation", entry.textOrientation || "mixed");
+          setStyleIfChanged(entry.element, "textRendering", entry.textRendering || "auto");
+          setStyleIfChanged(entry.element, "textTransform", entry.textTransform || "none");
+          setStyleIfChanged(entry.element, "paddingTop", scaledCssLength(entry.paddingTop, scaleY));
+          setStyleIfChanged(entry.element, "paddingRight", scaledCssLength(entry.paddingRight, scaleX));
+          setStyleIfChanged(entry.element, "paddingBottom", scaledCssLength(entry.paddingBottom, scaleY));
+          setStyleIfChanged(entry.element, "paddingLeft", scaledCssLength(entry.paddingLeft, scaleX));
+        } else {
+          setStyleIfChanged(entry.element, "font", `${Math.max(1, rect.fontSize)}px ${entry.fontFace || "sans-serif"}`);
+          setStyleIfChanged(entry.element, "lineHeight", `${Math.max(1, rect.height)}px`);
+        }
       }
     }
     function setStyleIfChanged(element, name, value) {
       if (element.style[name] !== value) element.style[name] = value;
     }
     function entryIsVisible(entry) {
+      if (entry.domSource) return domSourceIsVisible(entry.domSource);
       const owner = entry.owner;
       if (!owner || owner.destroyed || !owner.parent) return false;
       if (!ownerBelongsToActiveScene(owner)) return false;
@@ -1023,6 +1221,17 @@
       return window.SceneManager?._scene || overlayState.lastScene || null;
     }
     function toPageRect(entry) {
+      if (entry.domSource) {
+        const rect2 = entry.domSource.getBoundingClientRect();
+        if (rect2.width <= 0 || rect2.height <= 0) return null;
+        return {
+          left: roundCssPixel(rect2.left),
+          top: roundCssPixel(rect2.top),
+          width: roundCssPixel(rect2.width),
+          height: roundCssPixel(rect2.height),
+          fontSize: entry.fontSize || 24
+        };
+      }
       const graphics = window.Graphics;
       const canvas = graphics && graphics._canvas;
       if (!canvas) return null;
@@ -1147,33 +1356,43 @@
       focusGameTarget,
       installDictionaryGuardInputHooks,
       installRpgMakerOverlayHooks,
+      installTyranoOverlayHooks,
       refreshOverlayClasses,
       scheduleFlush
     };
   }
 
   // player-runtime/bridge/viewport.ts
+  function detectNativeGameSize({ graphics, tyranoConfig, canvas }) {
+    function size(width, height) {
+      const normalizedWidth = positiveFiniteNumber(width);
+      const normalizedHeight = positiveFiniteNumber(height);
+      return normalizedWidth && normalizedHeight ? { width: normalizedWidth, height: normalizedHeight } : null;
+    }
+    return size(graphics?.width || graphics?._width || graphics?.boxWidth, graphics?.height || graphics?._height || graphics?.boxHeight) || size(tyranoConfig?.scWidth, tyranoConfig?.scHeight) || size(canvas?.width, canvas?.height);
+  }
   function createViewportBridge({ postParentMessage, scheduleFlush }) {
     let latestPlayerViewport = null;
     let lastAppliedViewport = "";
     let viewportFitFrame = 0;
+    function nativeGameSize() {
+      return detectNativeGameSize({
+        graphics: window.Graphics,
+        tyranoConfig: window.TYRANO?.kag?.config || window.config,
+        canvas: document.querySelector("canvas")
+      });
+    }
     function installViewportBridge() {
       const notify = () => {
-        const graphics = window.Graphics || {};
-        const canvas = graphics._canvas || document.querySelector("canvas");
-        const width = Number(graphics.width || canvas?.width || 816);
-        const height = Number(graphics.height || canvas?.height || 624);
-        if (width > 0 && height > 0) {
-          postParentMessage({ type: "game-viewport", width, height });
-        }
+        const detected = nativeGameSize();
+        if (!detected) return false;
+        postParentMessage({ type: "game-viewport", ...detected });
+        return true;
       };
       notify();
       window.addEventListener("resize", notify);
       const timer = window.setInterval(() => {
-        notify();
-        if (window.Graphics && (window.Graphics.width || window.Graphics._canvas)) {
-          window.clearInterval(timer);
-        }
+        if (notify()) window.clearInterval(timer);
       }, 250);
       window.addEventListener("resize", scheduleViewportFit);
       scheduleViewportFit();
@@ -1216,7 +1435,7 @@
         }
       } catch (error) {
         lastAppliedViewport = "";
-        console.warn("[MZ Browser Player viewport] Could not notify RPG Maker resize.", error);
+        console.warn("[Local Web Game Player viewport] Could not notify RPG Maker resize.", error);
       }
     }
     function rpgMakerNativeSize() {
@@ -1311,7 +1530,7 @@
         try {
           applyViewportFit();
         } catch (error) {
-          console.warn("[MZ Browser Player viewport] Could not fit player viewport.", error);
+          console.warn("[Local Web Game Player viewport] Could not fit player viewport.", error);
         }
       });
     }
@@ -1550,6 +1769,7 @@
     installRpgMakerEncryptionFallback();
     overlay.ensureOverlayDom();
     overlay.installRpgMakerOverlayHooks();
+    overlay.installTyranoOverlayHooks();
     overlay.installDictionaryGuardInputHooks();
     overlay.refreshOverlayClasses();
     parent.postStatus();

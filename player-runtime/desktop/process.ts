@@ -43,7 +43,7 @@ export function createProcessRuntime() {
 
   function unsupportedProcessOperation(name) {
     return function unsupported() {
-      throw new Error("MZ browser player cannot provide process." + name + "().");
+      throw new Error("Local Web Game Player cannot provide process." + name + "().");
     };
   }
 

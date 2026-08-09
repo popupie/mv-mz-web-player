@@ -80,7 +80,7 @@ export function LibraryPanel({
       <div className="sidebar-top">
         <div className="brand-row">
           <div>
-            <h1>MV/MZ Web Player</h1>
+            <h1>Local Web Game Player</h1>
           </div>
           <div className="brand-actions">
             <button

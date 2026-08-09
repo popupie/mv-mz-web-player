@@ -171,7 +171,7 @@ function deletePlayerDb(): Promise<void> {
     const timeoutId = globalThis.setTimeout(() => {
       reject(
         new Error(
-          "Storage is still open in another tab. Close other MV/MZ Web Player tabs and try again.",
+          "Storage is still open in another tab. Close other Local Web Game Player tabs and try again.",
         ),
       );
     }, 5000);

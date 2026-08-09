@@ -41,6 +41,7 @@ import { installRpgMakerEncryptionFallback } from "./encryptionFallback";
   installRpgMakerEncryptionFallback();
   overlay.ensureOverlayDom();
   overlay.installRpgMakerOverlayHooks();
+  overlay.installTyranoOverlayHooks();
   overlay.installDictionaryGuardInputHooks();
   overlay.refreshOverlayClasses();
   parent.postStatus();
