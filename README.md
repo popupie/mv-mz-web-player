@@ -79,11 +79,16 @@ Desktop wrapper files such as Electron's `main.js`, `package.json`, and
 uses browser storage for TyranoScript exports that were configured for desktop
 file saves.
 
+## Extracting Packaged Desktop Games
+
+Extraction does not guarantee browser compatibility. Games that depend on
+unsupported Electron or Node.js APIs may still fail. Encrypted or DRM-protected
+packages are also not supported.
+
 ### Electron games packaged as `app.asar`
 
-Electron can bundle an application's source files into `app.asar`. The official
-[Electron packaging guide](https://www.electronjs.org/docs/latest/tutorial/application-distribution/)
-shows it inside `Game.app/Contents/Resources` on macOS and inside the game's
+Electron can bundle an application's source files into `app.asar`. The archive
+is usually inside `Game.app/Contents/Resources` on macOS or the game's
 `resources` folder on Windows. Packaged Linux applications commonly use the
 same `resources` folder layout.
 
@@ -102,9 +107,21 @@ entry point. For TyranoScript, look for `index.html`, `tyrano`, and `data`. For
 RPG Maker MV or MZ, look for `index.html`, `js`, and `data`, sometimes inside a
 `www` folder. Open that folder in Local Web Game Player.
 
-Extraction does not guarantee browser compatibility. Games that depend on
-unsupported Electron or Node APIs may still fail. Encrypted or DRM-protected
-packages are also not supported.
+### Games distributed as a packaged executable
+
+Enigma Virtual Box can bundle a game's files into its Windows executable. The
+[official `evbunpack` project](https://github.com/mos9527/evbunpack) provides a
+command-line tool and prebuilt Windows releases for extracting these files.
+
+Extract the executable into a new folder without modifying the original game:
+
+```sh
+evbunpack "/path/to/Game.exe" "./evb_extract"
+```
+
+In the extracted folder, look for the same web entry point and supporting
+folders described above. The game files may be nested inside one or more
+subdirectories; open the folder that directly contains `index.html`.
 
 ## Local Setup
 
