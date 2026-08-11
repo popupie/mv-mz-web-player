@@ -53,10 +53,16 @@ export function PlayerPanel({
               <code>index.html</code>.
             </p>
             <p>
-              If a TyranoScript Electron game only has{" "}
-              <code>resources/app.asar</code>, extract it first, then open the
-              extracted folder containing <code>index.html</code>,{" "}
-              <code>tyrano</code>, and <code>data</code>.
+              If the game files are packed inside an archive or executable,
+              see the extraction instructions in the{" "}
+              <a
+                href={`${githubUrl}#extracting-packaged-desktop-games`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                GitHub README
+              </a>
+              .
             </p>
           </section>
 
