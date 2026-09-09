@@ -195,3 +195,62 @@ describe("service worker Tyrano compatibility helpers", () => {
     expect(html).toContain("__MZ_PLAYER_DESKTOP_CONFIG");
   });
 });
+
+describe("service worker WOLF RPG compatibility helpers", () => {
+  it("detects Browser Woditor exports", () => {
+    const helpers = loadServiceWorkerHelpers();
+    const files = [
+      { path: "index.html", size: 1, mime: "text/html" },
+      { path: "woditor.js", size: 1, mime: "text/javascript" },
+      { path: "woditor.wasm", size: 1, mime: "application/wasm" },
+      { path: "asset_manifest.json", size: 1, mime: "application/json" },
+    ];
+
+    expect(helpers.isWolfRpgGame(files)).toBe(true);
+    expect(helpers.isWolfRpgGame([{ path: "index.html" }])).toBe(false);
+  });
+
+  it("does not inject RPG Maker desktop shims into Browser Woditor", () => {
+    const helpers = loadServiceWorkerHelpers();
+    const game = { id: "wolf-1", settings: {} };
+    const files = [
+      { path: "index.html", size: 1, mime: "text/html" },
+      { path: "woditor.js", size: 1, mime: "text/javascript" },
+      { path: "woditor.wasm", size: 1, mime: "application/wasm" },
+      { path: "Data.wolf", size: 1, mime: "application/octet-stream" },
+    ];
+    const html = helpers.injectBridge("<html><head></head><body></body></html>", game, files);
+
+    expect(html).not.toContain("/runtime-bridge.js");
+    expect(html).not.toContain("/mz-player-runtime/desktop.js");
+    expect(html).not.toContain("__MZ_PLAYER_DESKTOP_CONFIG");
+  });
+
+  it("bridges loose WOLF assets with Blob URLs before Browser Woditor starts", () => {
+    const helpers = loadServiceWorkerHelpers();
+    const game = { id: "wolf-loose-1", settings: {} };
+    const files = [
+      { path: "index.html", size: 1, mime: "text/html" },
+      { path: "woditor.js", size: 1, mime: "text/javascript" },
+      { path: "woditor.wasm", size: 1, mime: "application/wasm" },
+      { path: "asset_manifest.json", size: 1, mime: "application/json" },
+      { path: "lib/lazy_assets.js", size: 1, mime: "text/javascript" },
+      { path: "Data/BasicData/Game.dat", size: 1, mime: "application/octet-stream" },
+    ];
+    const source = [
+      "<html><head></head><body>",
+      '<script src="lib/lazy_assets.js"></script>',
+      '<script async src="woditor.js"></script>',
+      "</body></html>",
+    ].join("");
+    const html = helpers.injectBridge(source, game, files);
+
+    expect(helpers.isLooseWolfRpgGame(files)).toBe(true);
+    expect(html).toContain("__WOLF_PLAYER_CONFIG__");
+    expect(html).toContain('"woditorSrc":"woditor.js"');
+    expect(html).toContain("/mz-player-runtime/wolf.js");
+    expect(html).not.toContain('src="lib/lazy_assets.js"');
+    expect(html).not.toContain('<script async src="woditor.js"></script>');
+    expect(html).not.toContain("/runtime-bridge.js");
+  });
+});

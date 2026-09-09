@@ -6,6 +6,7 @@ const BLOB_STORE = "blobs";
 const HANDLE_STORE = "handles";
 const PLAYER_DESKTOP_RUNTIME_VERSION = "desktop-api-1";
 const PLAYER_BRIDGE_RUNTIME_VERSION = "bridge-api-2";
+const PLAYER_WOLF_RUNTIME_VERSION = "wolf-assets-1";
 const SESSION_FILE_TIMEOUT_MS = 10000;
 const EMPTY_SOURCE_MAP_TEXT = "{\"version\":3,\"sources\":[],\"mappings\":\"\"}";
 const RPG_MAKER_ENCRYPTED_HEADER_BYTES = Uint8Array.from([
@@ -815,6 +816,36 @@ function isTyranoGame(files) {
   return false;
 }
 
+function isWolfRpgGame(files) {
+  let hasRuntimeScript = false;
+  let hasRuntimeModule = false;
+  let hasGameData = false;
+
+  for (const file of files) {
+    const path = normalizePath(file.path).toLowerCase();
+    hasRuntimeScript ||= path === "woditor.js" || path.endsWith("/woditor.js");
+    hasRuntimeModule ||= path === "woditor.wasm" || path.endsWith("/woditor.wasm");
+    hasGameData ||= ["data.wolf", "asset_manifest.json"].some(
+      (name) => path === name || path.endsWith(`/${name}`),
+    );
+    if (hasRuntimeScript && hasRuntimeModule && hasGameData) return true;
+  }
+
+  return false;
+}
+
+function isLooseWolfRpgGame(files) {
+  if (!isWolfRpgGame(files)) return false;
+  let hasManifest = false;
+  let hasLazyLoader = false;
+  for (const file of files) {
+    const path = normalizePath(file.path).toLowerCase();
+    hasManifest ||= path === "asset_manifest.json" || path.endsWith("/asset_manifest.json");
+    hasLazyLoader ||= path === "lib/lazy_assets.js" || path.endsWith("/lib/lazy_assets.js");
+  }
+  return hasManifest && hasLazyLoader;
+}
+
 function adaptTyranoConfig(text) {
   return text.replace(
     /^(\s*;\s*configSave\s*=\s*)file(\s*(?:\/\/.*)?)$/gim,
@@ -996,13 +1027,34 @@ function desktopRuntimeConfig(game, files) {
   };
 }
 
+function adaptLooseWolfHtml(html, game) {
+  const lazyLoaderPattern = /<script\b[^>]*\bsrc=["'][^"']*lib\/lazy_assets\.js(?:\?[^"']*)?["'][^>]*><\/script>/gi;
+  const woditorPattern = /<script\b[^>]*\bsrc=["']([^"']*woditor\.js(?:\?[^"']*)?)["'][^>]*><\/script>/i;
+  const match = woditorPattern.exec(html);
+  if (!match) return html;
+
+  const config = jsonForScript({
+    gameId: game.id,
+    woditorSrc: match[1],
+  });
+  const bootstrap = [
+    `<script>window.__WOLF_PLAYER_CONFIG__=${config};</script>`,
+    `<script src="/mz-player-runtime/wolf.js?v=${PLAYER_WOLF_RUNTIME_VERSION}"></script>`,
+  ].join("");
+  return html.replace(lazyLoaderPattern, "").replace(woditorPattern, bootstrap);
+}
+
 function injectBridge(html, game, files) {
   const bridgeConfig = `<script>window.__MZ_PLAYER_BRIDGE__=${jsonForScript({
     gameId: game.id,
     settings: game.settings,
   })};</script>`;
   const isTyrano = isTyranoGame(files);
-  const desktopScripts = isTyrano ? "" : [
+  const isWolfRpg = isWolfRpgGame(files);
+  const preparedHtml = isLooseWolfRpgGame(files)
+    ? adaptLooseWolfHtml(html, game)
+    : html;
+  const desktopScripts = isTyrano || isWolfRpg ? "" : [
     `<script>window.__MZ_PLAYER_DESKTOP_CONFIG=${jsonForScript(
       desktopRuntimeConfig(game, files),
     )};</script>`,
@@ -1011,12 +1063,12 @@ function injectBridge(html, game, files) {
   ].join("");
   const runtimeScripts = [
     desktopScripts,
-    `<script src="/runtime-bridge.js?v=${PLAYER_BRIDGE_RUNTIME_VERSION}"></script>`,
+    isWolfRpg ? "" : `<script src="/runtime-bridge.js?v=${PLAYER_BRIDGE_RUNTIME_VERSION}"></script>`,
   ].join("");
   const config = `${bridgeConfig}${runtimeScripts}`;
 
-  if (/<head[^>]*>/i.test(html)) {
-    return html.replace(/<head([^>]*)>/i, `<head$1>${config}`);
+  if (/<head[^>]*>/i.test(preparedHtml)) {
+    return preparedHtml.replace(/<head([^>]*)>/i, `<head$1>${config}`);
   }
-  return `${config}${html}`;
+  return `${config}${preparedHtml}`;
 }

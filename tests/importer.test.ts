@@ -126,6 +126,24 @@ describe("folder handle scanning", () => {
     expect(candidate.title).toBe("Selected Game");
   });
 
+  it("uses the Wolf Tools browser game title", async () => {
+    const handle = directoryHandle("False Myth Web Assets", {
+      "index.html": fileHandle("index.html", 10),
+      "woditor.js": fileHandle("woditor.js", 20),
+      "woditor.wasm": fileHandle("woditor.wasm", 30),
+      "Data.wolf": fileHandle("Data.wolf", 40),
+      "browser-game.json": fileHandle(
+        "browser-game.json",
+        JSON.stringify({ title: "False Myth", engine: "wolf-rpg" }),
+      ),
+    });
+
+    const candidate = await candidateFromDirectoryHandle(handle);
+
+    expect(candidate.title).toBe("False Myth");
+    expect(candidate.entryPath).toBe("index.html");
+  });
+
   it("falls back to the nested game folder when the selected folder wraps it", async () => {
     const handle = directoryHandle("Outer", {
       Inner: directoryHandle("Inner", {

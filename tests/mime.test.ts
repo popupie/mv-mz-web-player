@@ -16,6 +16,7 @@ describe("detectMime", () => {
     expect(detectMime("audio/bgm/theme.m4a___")).toBe("audio/mp4");
     expect(detectMime("movies/opening.webm_")).toBe("video/webm");
     expect(detectMime("movies/opening.mp4__")).toBe("video/mp4");
+    expect(detectMime("woditor.wasm")).toBe("application/wasm");
   });
 
   it("falls back to bytes for unknown files", () => {

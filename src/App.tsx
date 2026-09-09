@@ -7,6 +7,7 @@ import { useTextLog } from "./hooks/useTextLog";
 import { chordFromEvent, sameChord } from "./lib/keyChords";
 import { reservedKeyForEvent } from "./lib/keys";
 import { defaultDictionaryDismissGuard, dictionaryGuardFor, overlayTogglePatch, showTogglePatch } from "./lib/playerSettings";
+import { createWolfAssetObjectUrls, type WolfAssetObjectUrlSet } from "./lib/wolfAssets";
 import type { DictionaryDismissGuard, GameRecord, PlayerToParentMessage } from "./lib/types";
 
 const textLogLimit = 100;
@@ -18,6 +19,10 @@ export default function App() {
   const [recordingGuardTrigger, setRecordingGuardTrigger] = useState(false);
   const directoryInputRef = useRef<HTMLInputElement>(null);
   const zipInputRef = useRef<HTMLInputElement>(null);
+  const wolfAssetsRef = useRef<{
+    key: string;
+    promise: Promise<WolfAssetObjectUrlSet>;
+  } | undefined>(undefined);
 
   const library = useGameLibrary(() => setRuntimeError(null));
   const player = usePlayerFrame(library.activeGame?.id);
@@ -30,11 +35,68 @@ export default function App() {
   } = useTextLog(textLogLimit);
   const activeDictionaryGuard = library.activeGame ? dictionaryGuardFor(library.activeGame) : defaultDictionaryDismissGuard;
   const quotaPercent = library.storage?.quota && library.storage.usage ? Math.min(100, Math.round((library.storage.usage / library.storage.quota) * 100)) : 0;
+  const activeGameKey = library.activeGame
+    ? `${library.activeGame.id}:${library.activeGame.updatedAt}`
+    : "";
+
+  useEffect(() => {
+    return () => {
+      const current = wolfAssetsRef.current;
+      if (!current || current.key !== activeGameKey) return;
+      wolfAssetsRef.current = undefined;
+      void current.promise.then((value) => value.release(), () => undefined);
+    };
+  }, [activeGameKey]);
+
+  function wolfAssetsForActiveGame(): Promise<WolfAssetObjectUrlSet> {
+    const game = library.activeGame;
+    if (!game) return Promise.reject(new Error("No WOLF game is active."));
+    const key = `${game.id}:${game.updatedAt}`;
+    const current = wolfAssetsRef.current;
+    if (current?.key === key) return current.promise;
+    if (current) void current.promise.then((value) => value.release(), () => undefined);
+    const promise = createWolfAssetObjectUrls(game.id);
+    wolfAssetsRef.current = { key, promise };
+    return promise;
+  }
+
+  async function respondWithWolfAssets(
+    event: MessageEvent<PlayerToParentMessage>,
+    message: Extract<PlayerToParentMessage, { type: "wolf-assets-request" }>,
+  ) {
+    const game = library.activeGame;
+    if (
+      !game ||
+      message.gameId !== game.id ||
+      event.source !== player.frameRef.current?.contentWindow
+    ) return;
+
+    try {
+      const value = await wolfAssetsForActiveGame();
+      (event.source as Window).postMessage({
+        type: "wolf-assets-response",
+        requestId: message.requestId,
+        assets: value.assets,
+      }, window.location.origin);
+    } catch (cause) {
+      const error = cause instanceof Error ? cause.message : "Could not prepare WOLF assets.";
+      setRuntimeError(error);
+      (event.source as Window).postMessage({
+        type: "wolf-assets-response",
+        requestId: message.requestId,
+        error,
+      }, window.location.origin);
+    }
+  }
 
   useEffect(() => {
     const onMessage = (event: MessageEvent<PlayerToParentMessage>) => {
       if (event.origin !== window.location.origin || !event.data || typeof event.data !== "object") return;
       const message = event.data;
+      if (message.type === "wolf-assets-request") {
+        void respondWithWolfAssets(event, message);
+        return;
+      }
       if (message.type === "reserved-key") {
         void handleReservedAction(message.action);
       }
