@@ -35,23 +35,12 @@ export default function App() {
   } = useTextLog(textLogLimit);
   const activeDictionaryGuard = library.activeGame ? dictionaryGuardFor(library.activeGame) : defaultDictionaryDismissGuard;
   const quotaPercent = library.storage?.quota && library.storage.usage ? Math.min(100, Math.round((library.storage.usage / library.storage.quota) * 100)) : 0;
-  const activeGameKey = library.activeGame
-    ? `${library.activeGame.id}:${library.activeGame.updatedAt}`
-    : "";
-
-  useEffect(() => {
-    return () => {
-      const current = wolfAssetsRef.current;
-      if (!current || current.key !== activeGameKey) return;
-      wolfAssetsRef.current = undefined;
-      void current.promise.then((value) => value.release(), () => undefined);
-    };
-  }, [activeGameKey]);
-
   function wolfAssetsForActiveGame(): Promise<WolfAssetObjectUrlSet> {
     const game = library.activeGame;
     if (!game) return Promise.reject(new Error("No WOLF game is active."));
-    const key = `${game.id}:${game.updatedAt}`;
+    // Woditor can request a new asset long after startup. A settings update must
+    // not revoke the active iframe's URLs while the game is still running.
+    const key = game.id;
     const current = wolfAssetsRef.current;
     if (current?.key === key) return current.promise;
     if (current) void current.promise.then((value) => value.release(), () => undefined);

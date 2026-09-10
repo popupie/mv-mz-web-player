@@ -16,6 +16,8 @@ type WolfAssetResponse = {
   error?: string;
 };
 
+import { normalizeWolfPath, wolfPathKeys } from "./wolfPaths";
+
 declare const Module: { preRun: Array<() => void> };
 declare const FS: {
   analyzePath(path: string): { exists: boolean };
@@ -73,30 +75,22 @@ function requestAssets(settings: WolfPlayerConfig): Promise<WolfAsset[]> {
   });
 }
 
-function normalize(path: unknown): string {
-  const parts = String(path).replaceAll("\\", "/").split("/");
-  const normalized: string[] = [];
-  for (const part of parts) {
-    if (!part || part === ".") continue;
-    if (part === "..") normalized.pop();
-    else normalized.push(part);
-  }
-  return normalized.join("/");
-}
-
 function installAssetLoader(assets: WolfAsset[]) {
   const available = new Map<string, WolfAsset>();
   for (const asset of assets) {
-    const path = normalize(asset.path);
+    const path = normalizeWolfPath(asset.path);
     const normalized = { ...asset, path };
-    available.set(path.toLowerCase(), normalized);
-    if (path.toLowerCase().startsWith("data/")) {
-      available.set(path.slice(5).toLowerCase(), normalized);
-    }
+    for (const key of wolfPathKeys(path)) available.set(key, normalized);
   }
 
-  const stats = { requests: 0, bytes: 0, files: [] as string[] };
+  const stats = {
+    requests: 0,
+    bytes: 0,
+    files: [] as string[],
+    missing: [] as string[],
+  };
   (window as typeof window & { WolfLazyAssetStats?: typeof stats }).WolfLazyAssetStats = stats;
+  const reportedMissing = new Set<string>();
 
   function ensureParents(path: string) {
     const parts = path.split("/");
@@ -109,12 +103,26 @@ function installAssetLoader(assets: WolfAsset[]) {
   }
 
   function load(path: unknown): boolean {
-    const requested = normalize(path);
-    const requestedLower = requested.toLowerCase();
-    const dataOffset = requestedLower.lastIndexOf("/data/");
-    const canonical = dataOffset >= 0 ? requested.slice(dataOffset + 1) : requested;
-    const asset = available.get(requestedLower) || available.get(canonical.toLowerCase());
-    if (!asset) return false;
+    const requested = normalizeWolfPath(path);
+    const asset = wolfPathKeys(requested)
+      .map((key) => available.get(key))
+      .find((candidate) => candidate !== undefined);
+    if (!asset) {
+      const lower = requested.toLowerCase();
+      if (
+        lower.includes("data/") &&
+        /\.[^/.]{1,8}$/u.test(requested) &&
+        !/-(?:gamecache|save)\//iu.test(requested) &&
+        !lower.endsWith(".wolf") &&
+        !lower.endsWith(".wolfx") &&
+        !reportedMissing.has(lower)
+      ) {
+        reportedMissing.add(lower);
+        stats.missing.push(requested);
+        console.debug(`Wolf Tools could not match asset: ${requested}`);
+      }
+      return false;
+    }
 
     const absolute = `/${requested}`;
     if (FS.analyzePath(absolute).exists) return true;

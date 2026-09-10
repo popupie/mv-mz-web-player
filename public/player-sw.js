@@ -6,7 +6,7 @@ const BLOB_STORE = "blobs";
 const HANDLE_STORE = "handles";
 const PLAYER_DESKTOP_RUNTIME_VERSION = "desktop-api-1";
 const PLAYER_BRIDGE_RUNTIME_VERSION = "bridge-api-2";
-const PLAYER_WOLF_RUNTIME_VERSION = "wolf-assets-1";
+const PLAYER_WOLF_RUNTIME_VERSION = "wolf-assets-3";
 const SESSION_FILE_TIMEOUT_MS = 10000;
 const EMPTY_SOURCE_MAP_TEXT = "{\"version\":3,\"sources\":[],\"mappings\":\"\"}";
 const RPG_MAKER_ENCRYPTED_HEADER_BYTES = Uint8Array.from([
@@ -1037,8 +1037,9 @@ function adaptLooseWolfHtml(html, game) {
     gameId: game.id,
     woditorSrc: match[1],
   });
+  const gameId = jsonForScript(game.id);
   const bootstrap = [
-    `<script>window.__WOLF_PLAYER_CONFIG__=${config};</script>`,
+    `<script>(()=>{const url=new URL(location.href);url.searchParams.set("Game_ID",${gameId});history.replaceState(null,"",url);window.__WOLF_PLAYER_CONFIG__=${config};})();</script>`,
     `<script src="/mz-player-runtime/wolf.js?v=${PLAYER_WOLF_RUNTIME_VERSION}"></script>`,
   ].join("");
   return html.replace(lazyLoaderPattern, "").replace(woditorPattern, bootstrap);

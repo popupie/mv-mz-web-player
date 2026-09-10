@@ -248,6 +248,7 @@ describe("service worker WOLF RPG compatibility helpers", () => {
     expect(helpers.isLooseWolfRpgGame(files)).toBe(true);
     expect(html).toContain("__WOLF_PLAYER_CONFIG__");
     expect(html).toContain('"woditorSrc":"woditor.js"');
+    expect(html).toContain('searchParams.set("Game_ID","wolf-loose-1")');
     expect(html).toContain("/mz-player-runtime/wolf.js");
     expect(html).not.toContain('src="lib/lazy_assets.js"');
     expect(html).not.toContain('<script async src="woditor.js"></script>');

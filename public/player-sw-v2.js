@@ -1,1 +1,1 @@
-importScripts("/player-sw.js?v=wolf-assets-2");
+importScripts("/player-sw.js?v=wolf-assets-4");
